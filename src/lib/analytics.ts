@@ -786,6 +786,100 @@ export async function fetchLinkedInMetrics(
 }
 
 /**
+ * Fetch real Threads post metrics using Meta Threads Graph API
+ * Uses threads_manage_insights permission (views, likes, replies, reposts, quotes)
+ */
+export async function fetchThreadsMetrics(
+  mediaId: string,
+  account: SocialAccount
+): Promise<PlatformPostMetrics> {
+  const cleanId = mediaId.trim();
+  const now = new Date().toISOString();
+
+  let accessToken = account.accessToken || '';
+  if (accessToken.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(accessToken);
+      accessToken = parsed.access_token || accessToken;
+    } catch {}
+  }
+
+  if (!accessToken) {
+    return {
+      platform: 'threads',
+      externalPostId: cleanId,
+      lastFetchedAt: now,
+      fetchStatus: 'permission_error',
+      errorMessage: 'Missing Threads access token. Please connect your Threads account.',
+    };
+  }
+
+  try {
+    const url = `https://graph.threads.net/v1.0/${encodeURIComponent(cleanId)}/insights?metric=views,likes,replies,reposts,quotes&access_token=${encodeURIComponent(accessToken)}`;
+    const res = await fetch(url);
+    const json = await res.json();
+
+    if (json.error) {
+      return {
+        platform: 'threads',
+        externalPostId: cleanId,
+        lastFetchedAt: now,
+        fetchStatus: 'failed',
+        errorMessage: json.error.message || 'Failed to fetch Threads metrics.',
+      };
+    }
+
+    let views = 0;
+    let likes = 0;
+    let replies = 0;
+    let reposts = 0;
+    let quotes = 0;
+
+    if (Array.isArray(json.data)) {
+      json.data.forEach((metricItem: any) => {
+        const val = metricItem.total_value?.value ?? metricItem.values?.[0]?.value ?? 0;
+        if (metricItem.name === 'views') views = Number(val) || 0;
+        if (metricItem.name === 'likes') likes = Number(val) || 0;
+        if (metricItem.name === 'replies' || metricItem.name === 'thread_replies') replies = Number(val) || 0;
+        if (metricItem.name === 'reposts') reposts = Number(val) || 0;
+        if (metricItem.name === 'quotes') quotes = Number(val) || 0;
+      });
+    }
+
+    const engagementRate =
+      views > 0
+        ? parseFloat((((likes + replies + reposts + quotes) / views) * 100).toFixed(2))
+        : 0;
+
+    return {
+      platform: 'threads',
+      externalPostId: cleanId,
+      views,
+      impressions: views,
+      reach: views,
+      likes,
+      comments: replies,
+      shares: reposts + quotes,
+      engagementRate,
+      lastFetchedAt: now,
+      fetchStatus: 'success',
+      rawDetails: {
+        reposts,
+        quotes,
+      },
+    };
+  } catch (err: any) {
+    return {
+      platform: 'threads',
+      externalPostId: cleanId,
+      lastFetchedAt: now,
+      fetchStatus: 'failed',
+      errorMessage: err?.message || 'Failed to connect to Threads Graph API',
+    };
+  }
+}
+
+/**
  * Unified Dispatcher:
  * Dispatches metric collection for any given platform and external ID
  */
@@ -805,6 +899,8 @@ export async function fetchPlatformPostMetrics(
       return fetchTwitterMetrics(externalPostId, account);
     case 'linkedin':
       return fetchLinkedInMetrics(externalPostId, account);
+    case 'threads':
+      return fetchThreadsMetrics(externalPostId, account);
     default:
       return {
         platform,
