@@ -76,6 +76,7 @@ import { parseDateSafe, formatLocalToUtcIso, extractLocalDateAndTime, getLocalDa
 import { UpgradePlanModal } from '@/components/UpgradePlanModal';
 import { SubscriptionService, MonthlyUsageSummary } from '@/lib/subscription';
 import { OFFICIAL_YOUTUBE_CATEGORIES } from '@/app/api/youtube/categories/route';
+import { SUPABASE_PUBLIC_URL, SUPABASE_PUBLIC_ANON_KEY } from '@/lib/supabase';
 
 interface CreatePostDashboardProps {
   postType: 'text' | 'image' | 'video';
@@ -272,13 +273,12 @@ export interface PublishingModalState {
   }[];
 }
 
+const MAX_UPLOAD_SIZE = 50 * 1024 * 1024; // 50 MB limit
+
 /**
- * Real-time byte-level upload progress tracking using XMLHttpRequest.
- * Reports actual progress events (1% to 88%) during byte streaming,
- * transitions to 'processing' ("Finalizing upload...") once bytes are transferred,
- * and reaches 100% only upon confirmed HTTP 200 server completion.
+ * Fallback server upload for small files (<= 4.2 MB) if direct storage upload encounters issues
  */
-const uploadFileWithProgress = (
+const fallbackToServerUpload = (
   file: File,
   onProgress: (percent: number, loaded: number, total: number, stage: MediaUploadState['stage']) => void
 ): Promise<{ success: boolean; url?: string; thumbnailUrl?: string; error?: string }> => {
@@ -287,7 +287,97 @@ const uploadFileWithProgress = (
     const formData = new FormData();
     formData.append('file', file);
 
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data.success && data.url) {
+            onProgress(100, file.size, file.size, 'complete');
+            resolve(data);
+          } else {
+            resolve({ success: false, error: 'Sorry, cannot upload it. Please choose another file.' });
+          }
+        } catch {
+          resolve({ success: false, error: 'Sorry, cannot upload it. Please choose another file.' });
+        }
+      } else {
+        const friendlyMsg =
+          xhr.status === 413
+            ? 'Sorry, cannot upload it. The file size exceeds the allowed limit. Please try a smaller video or image.'
+            : 'Sorry, cannot upload it. Please choose another file.';
+        resolve({ success: false, error: friendlyMsg });
+      }
+    };
+
+    xhr.onerror = () => {
+      resolve({ success: false, error: 'Sorry, cannot upload it. Please check your internet connection.' });
+    };
+
+    xhr.ontimeout = () => {
+      resolve({ success: false, error: 'Sorry, upload timed out. Please try again.' });
+    };
+
+    xhr.open('POST', '/api/media/upload');
+    xhr.send(formData);
+  });
+};
+
+/**
+ * Direct Cloud Storage Upload with real-time byte tracking.
+ * - Uploads directly to Supabase Storage ('postingtube-media') CDN via XMLHttpRequest.
+ * - Bypasses Vercel serverless 4.5 MB request body limit completely.
+ * - Generates permanent public HTTPS URLs suitable for social platforms and database storage.
+ * - Real-time byte progress (1% to 100%) during streaming.
+ * - Friendly polite warnings instead of technical HTTP errors.
+ */
+const uploadFileWithProgress = (
+  file: File,
+  onProgress: (percent: number, loaded: number, total: number, stage: MediaUploadState['stage']) => void
+): Promise<{ success: boolean; url?: string; thumbnailUrl?: string; error?: string }> => {
+  return new Promise((resolve) => {
+    // 1. Pre-flight file size check
+    if (file.size > MAX_UPLOAD_SIZE) {
+      resolve({
+        success: false,
+        error: 'Sorry, cannot upload it. The file size exceeds the 50MB limit. Please choose a smaller video or image.',
+      });
+      return;
+    }
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const filename = `${Date.now()}_${safeName}`;
+
+    // Normalize MIME type for strict Supabase Storage acceptance
+    let contentType = file.type || '';
+    const ext = filename.split('.').pop()?.toLowerCase();
+    if (contentType === 'image/jpg' || (!contentType && (ext === 'jpg' || ext === 'jpeg'))) {
+      contentType = 'image/jpeg';
+    } else if (!contentType && ext === 'png') {
+      contentType = 'image/png';
+    } else if (!contentType && ext === 'webp') {
+      contentType = 'image/webp';
+    } else if (!contentType && ext === 'gif') {
+      contentType = 'image/gif';
+    } else if (!contentType && ext === 'mp4') {
+      contentType = 'video/mp4';
+    } else if (!contentType && (ext === 'mov' || ext === 'quicktime')) {
+      contentType = 'video/quicktime';
+    } else if (!contentType && ext === 'webm') {
+      contentType = 'video/webm';
+    } else if (!contentType && ext === 'avi') {
+      contentType = 'video/x-msvideo';
+    }
+    if (!contentType) {
+      contentType = 'application/octet-stream';
+    }
+
+    const supabaseUrl = SUPABASE_PUBLIC_URL || 'https://mdykqpqhuwfpondyqnms.supabase.co';
+    const supabaseAnonKey = SUPABASE_PUBLIC_ANON_KEY;
+    const bucketName = 'postingtube-media';
+    const directTargetUrl = `${supabaseUrl}/storage/v1/object/${bucketName}/${encodeURIComponent(filename)}`;
+
     let finalizingTimer: any = null;
+    const xhr = new XMLHttpRequest();
 
     // Stage 1: Initial preparing
     onProgress(1, 0, file.size, 'preparing');
@@ -323,35 +413,54 @@ const uploadFileWithProgress = (
       }
 
       if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          if (data.success && data.url) {
-            onProgress(100, file.size, file.size, 'complete');
-            resolve(data);
-          } else {
-            resolve({ success: false, error: data.error || 'Server processing failed' });
-          }
-        } catch {
-          resolve({ success: false, error: 'Invalid response from media server' });
-        }
+        const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${filename}`;
+        onProgress(100, file.size, file.size, 'complete');
+        resolve({
+          success: true,
+          url: publicUrl,
+          thumbnailUrl: publicUrl,
+        });
       } else {
-        resolve({ success: false, error: `Upload failed (HTTP ${xhr.status})` });
+        // Fallback for smaller files (<= 4.2 MB) if direct cloud upload failed
+        if (file.size <= 4.2 * 1024 * 1024) {
+          fallbackToServerUpload(file, onProgress).then(resolve);
+        } else {
+          let friendlyError = 'Sorry, cannot upload it. Please choose another video or image.';
+          if (xhr.status === 413) {
+            friendlyError = 'Sorry, cannot upload it. The file size exceeds the allowed limit. Please try a smaller video or image.';
+          }
+          resolve({ success: false, error: friendlyError });
+        }
       }
     };
 
     xhr.onerror = () => {
       if (finalizingTimer) clearInterval(finalizingTimer);
-      resolve({ success: false, error: 'Network error during media upload. Check your connection.' });
+      if (file.size <= 4.2 * 1024 * 1024) {
+        fallbackToServerUpload(file, onProgress).then(resolve);
+      } else {
+        resolve({
+          success: false,
+          error: 'Sorry, cannot upload it. Please check your internet connection and try again.',
+        });
+      }
     };
 
     xhr.ontimeout = () => {
       if (finalizingTimer) clearInterval(finalizingTimer);
-      resolve({ success: false, error: 'Upload timed out. Please try again.' });
+      resolve({
+        success: false,
+        error: 'Sorry, upload timed out. Please try again with a faster connection.',
+      });
     };
 
     xhr.timeout = 180000; // 3 minute timeout
-    xhr.open('POST', '/api/media/upload');
-    xhr.send(formData);
+    xhr.open('POST', directTargetUrl);
+    xhr.setRequestHeader('apikey', supabaseAnonKey);
+    xhr.setRequestHeader('Authorization', `Bearer ${supabaseAnonKey}`);
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.setRequestHeader('x-upsert', 'true');
+    xhr.send(file);
   });
 };
 
@@ -727,19 +836,22 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
           setUploadState((prev) => ({
             ...prev,
             isUploading: false,
-            stage: 'error',
-            error: uploadRes.error || 'Failed to upload slide',
+            stage: 'idle',
+            error: null,
+            statusMessage: '',
           }));
-          showToast(uploadRes.error || 'Slide replacement failed.');
+          showToast(uploadRes.error || 'Sorry, cannot upload slide. Please choose another file.');
         }
       } catch (e: any) {
         console.warn('Replace slide error:', e);
         setUploadState((prev) => ({
           ...prev,
           isUploading: false,
-          stage: 'error',
-          error: e?.message || 'Error uploading slide',
+          stage: 'idle',
+          error: null,
+          statusMessage: '',
         }));
+        showToast('Sorry, cannot upload slide. Please choose another file.');
       }
       return;
     }
@@ -1877,13 +1989,27 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
         uploadPromiseResolveRef.current = null;
       }
     } else {
-      setUploadState((prev) => ({
-        ...prev,
+      // Cleanly remove failed media so the broken card does NOT remain stuck in the composer
+      setMediaList((prev) => prev.filter((m) => m.id !== mediaId));
+      if (localBlobUrl) {
+        try {
+          URL.revokeObjectURL(localBlobUrl);
+        } catch {}
+      }
+
+      setUploadState({
         isUploading: false,
-        stage: 'error',
-        statusMessage: 'Upload failed',
-        error: uploadRes.error || 'Failed to upload media to server.',
-      }));
+        progress: 0,
+        loadedBytes: 0,
+        totalBytes: 0,
+        stage: 'idle',
+        statusMessage: '',
+        error: null,
+      });
+
+      const userFriendlyMsg = uploadRes.error || 'Sorry, cannot upload it. Please choose another file.';
+      showToast(userFriendlyMsg);
+
       if (uploadPromiseResolveRef.current) {
         uploadPromiseResolveRef.current(false);
         uploadPromiseResolveRef.current = null;
@@ -3066,9 +3192,27 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                                         {(isUploading || uploadState.stage === 'error') && !customizeMediaPerPlatform && (
                                           <div className="absolute inset-0 bg-white/85 backdrop-blur-xs z-30 flex items-center justify-center p-3 select-none">
                                             {uploadState.stage === 'error' ? (
-                                              <div className="bg-white rounded-xl border border-rose-200 p-3 max-w-[240px] text-center space-y-2 shadow-lg">
-                                                <AlertCircle className="w-5 h-5 text-rose-600 mx-auto" />
-                                                <p className="text-[11px] text-rose-600 leading-tight">{uploadState.error || 'Upload failed.'}</p>
+                                              <div className="bg-white rounded-2xl border border-amber-200/90 p-4 max-w-[260px] text-center space-y-2.5 shadow-lg animate-in fade-in zoom-in-95 duration-150">
+                                                <div className="w-8 h-8 rounded-full bg-amber-50 border border-amber-200/80 flex items-center justify-center mx-auto text-amber-600">
+                                                  <Info className="w-4 h-4" />
+                                                </div>
+                                                <p className="text-xs text-gray-700 leading-snug font-medium">
+                                                  {uploadState.error || 'Sorry, cannot upload it. Please choose another file.'}
+                                                </p>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setUploadState((prev) => ({
+                                                      ...prev,
+                                                      stage: 'idle',
+                                                      error: null,
+                                                      statusMessage: '',
+                                                    }));
+                                                  }}
+                                                  className="text-[11px] font-semibold text-gray-600 hover:text-gray-900 px-3 py-1 bg-gray-100 hover:bg-gray-200/80 rounded-lg transition-colors cursor-pointer"
+                                                >
+                                                  Dismiss
+                                                </button>
                                               </div>
                                             ) : (
                                               <div className="bg-white rounded-2xl border border-gray-200/90 p-4 w-full max-w-[240px] shadow-lg text-center space-y-3 animate-in fade-in zoom-in-95 duration-150">

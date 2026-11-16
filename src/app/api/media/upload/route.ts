@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file') as File | null;
 
     if (!file) {
-      return NextResponse.json({ success: false, error: 'No file uploaded' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Sorry, no file was provided.' }, { status: 400 });
     }
 
     const bytes = await file.arrayBuffer();
@@ -121,6 +121,6 @@ export async function POST(req: NextRequest) {
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Media upload failed';
     console.error('[MediaUpload] Fatal upload error:', msg);
-    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Sorry, cannot upload it. Please choose another file.' }, { status: 500 });
   }
 }
