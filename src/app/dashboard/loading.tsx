@@ -1,5 +1,5 @@
-import { SpiderManLoadingScreen } from '@/components/SpiderManLoadingScreen';
+import { DashboardSkeletonLoader } from '@/components/DashboardSkeletonLoader';
 
 export default function DashboardLoading() {
-  return <SpiderManLoadingScreen message="Loading your Plan Poster session..." />;
+  return <DashboardSkeletonLoader message="Loading your Plan Poster session..." />;
 }

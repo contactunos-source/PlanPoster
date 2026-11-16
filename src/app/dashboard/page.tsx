@@ -1,12 +1,12 @@
 'use client';
 
 import { getLocalDateString, formatLocalToUtcIso } from '@/lib/dateUtils';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { Sidebar, ActiveTab } from '@/components/Sidebar';
 import { NewPostLaunchpad } from '@/components/NewPostLaunchpad';
 import { PlanPosterLogo } from '@/components/PlanPosterLogo';
-import { SpiderManLoadingScreen } from '@/components/SpiderManLoadingScreen';
+import { DashboardSkeletonLoader } from '@/components/DashboardSkeletonLoader';
 import {
   INITIAL_ACCOUNTS,
   INITIAL_POSTS,
@@ -39,18 +39,7 @@ import {
 import Link from 'next/link';
 import { FeedbackModal } from '@/components/FeedbackModal';
 
-const ViewLoadingSkeleton = () => (
-  <div className="p-4 sm:p-8 max-w-6xl mx-auto space-y-4 animate-pulse">
-    <div className="h-9 bg-gray-200/70 rounded-2xl w-44 mb-6" />
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div className="h-28 bg-gray-200/60 rounded-2xl" />
-      <div className="h-28 bg-gray-200/60 rounded-2xl" />
-      <div className="h-28 bg-gray-200/60 rounded-2xl" />
-      <div className="h-28 bg-gray-200/60 rounded-2xl" />
-    </div>
-    <div className="h-80 bg-gray-200/50 rounded-2xl mt-6" />
-  </div>
-);
+const ViewLoadingSkeleton = () => <DashboardSkeletonLoader fullPage={false} message="" />;
 
 // Code-split heavy views for massive performance & fast initial load on mobile/desktop
 const CalendarView = dynamic(() => import('@/components/CalendarView').then((m) => m.CalendarView), {
@@ -534,9 +523,26 @@ export default function DashboardPage({ initialTab }: { initialTab?: ActiveTab }
   const draftCount = posts.filter((p) => p.status === 'draft').length;
   const failedCount = posts.filter((p) => p.status === 'failed').length;
 
-  // Centralized tab changer: Synchronizes clean Buffer-style URL and localStorage across refresh with 0ms latency
+  // Tab switching skeleton effect for ultra-smooth professional transitions
+  const [isTabTransitioning, setIsTabTransitioning] = useState(false);
+  const tabTransitionTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (tabTransitionTimerRef.current) clearTimeout(tabTransitionTimerRef.current);
+    };
+  }, []);
+
+  // Centralized tab changer: Synchronizes clean Buffer-style URL and localStorage across refresh
   const handleTabChange = (tab: ActiveTab) => {
-    if (activeTab !== tab) setPreviousTab(activeTab);
+    if (activeTab !== tab) {
+      setPreviousTab(activeTab);
+      setIsTabTransitioning(true);
+      if (tabTransitionTimerRef.current) clearTimeout(tabTransitionTimerRef.current);
+      tabTransitionTimerRef.current = setTimeout(() => {
+        setIsTabTransitioning(false);
+      }, 140);
+    }
     setActiveTab(tab);
 
     try {
@@ -936,9 +942,9 @@ export default function DashboardPage({ initialTab }: { initialTab?: ActiveTab }
     }
   };
 
-  // Spider-Man session initialization loading screen (only on page refresh)
+  // Modern SaaS Skeleton loading screen (on page refresh / initial load / OAuth return)
   if (authChecking || !isLoaded) {
-    return <SpiderManLoadingScreen message="Loading your Plan Poster session..." />;
+    return <DashboardSkeletonLoader message="Loading your Plan Poster session..." />;
   }
 
   return (
@@ -1043,13 +1049,17 @@ export default function DashboardPage({ initialTab }: { initialTab?: ActiveTab }
         )}
 
         <div className="flex-1">
-        {activeTab === 'new-post' && (
-          <NewPostLaunchpad
-            onSelectType={handleCreateTypeSelected}
-            onGoToConnections={() => handleTabChange('connections')}
-            connectedCount={accounts.length}
-          />
-        )}
+        {isTabTransitioning ? (
+          <DashboardSkeletonLoader fullPage={false} message="" />
+        ) : (
+          <>
+            {activeTab === 'new-post' && (
+              <NewPostLaunchpad
+                onSelectType={handleCreateTypeSelected}
+                onGoToConnections={() => handleTabChange('connections')}
+                connectedCount={accounts.length}
+              />
+            )}
 
         {activeTab === 'create-composer' && (
           <CreatePostDashboard
@@ -1197,6 +1207,8 @@ export default function DashboardPage({ initialTab }: { initialTab?: ActiveTab }
             onRemoveAccount={handleRemoveAccount}
             onUpdateWorkspace={() => {}}
           />
+        )}
+          </>
         )}
         </div>
         {/* Mobile Native Bottom Navigation Bar */}
