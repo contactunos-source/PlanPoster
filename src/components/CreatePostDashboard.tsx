@@ -273,7 +273,7 @@ export interface PublishingModalState {
   }[];
 }
 
-const MAX_UPLOAD_SIZE = 50 * 1024 * 1024; // 50 MB limit
+const MAX_UPLOAD_SIZE = 100 * 1024 * 1024; // 100 MB limit (matches Instagram Reels limit)
 
 /**
  * Fallback server upload for small files (<= 4.2 MB) if direct storage upload encounters issues
@@ -339,7 +339,7 @@ const uploadFileWithProgress = (
     if (file.size > MAX_UPLOAD_SIZE) {
       resolve({
         success: false,
-        error: 'Sorry, cannot upload it. The file size exceeds the 50MB limit. Please choose a smaller video or image.',
+        error: 'Sorry, cannot upload it. The file size exceeds the 100MB limit. Please choose a smaller video or image.',
       });
       return;
     }
@@ -426,8 +426,15 @@ const uploadFileWithProgress = (
           fallbackToServerUpload(file, onProgress).then(resolve);
         } else {
           let friendlyError = 'Sorry, cannot upload it. Please choose another video or image.';
-          if (xhr.status === 413) {
-            friendlyError = 'Sorry, cannot upload it. The file size exceeds the allowed limit. Please try a smaller video or image.';
+          try {
+            const errData = JSON.parse(xhr.responseText);
+            if (errData?.code === 'EntityTooLarge' || errData?.statusCode === '413' || xhr.status === 413) {
+              friendlyError = 'Sorry, cannot upload it. The file size exceeds the cloud storage limit (maximum 50MB on current cloud plan). Please choose a smaller video or image.';
+            }
+          } catch {
+            if (xhr.status === 413) {
+              friendlyError = 'Sorry, cannot upload it. The file size exceeds the allowed limit. Please try a smaller video or image.';
+            }
           }
           resolve({ success: false, error: friendlyError });
         }
@@ -3064,7 +3071,7 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                                 <p className="text-[11px] text-gray-400 mt-1">
                                   {isYouTube
                                     ? 'Upload vertical video for YouTube Shorts (up to 500 MB)'
-                                    : 'Upload images, video, or select multiple for carousel'}
+                                    : 'Upload images, video (up to 100 MB), or select multiple for carousel'}
                                 </p>
                               </div>
                             ) : (
