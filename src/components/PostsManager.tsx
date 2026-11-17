@@ -177,6 +177,7 @@ export function getPlatformDestinationUrl(acc: SocialAccount, res?: any): string
       (acc.platform === 'facebook' && (url.includes('facebook.com') || url.includes('fb.com'))) ||
       (acc.platform === 'twitter' && (url.includes('twitter.com') || url.includes('x.com'))) ||
       (acc.platform === 'linkedin' && url.includes('linkedin.com')) ||
+      (acc.platform === 'threads' && (url.includes('threads.net') || url.includes('threads.com'))) ||
       (acc.platform === 'pinterest' && url.includes('pinterest.com'));
 
     if (isUrlMatchingPlatform) {
@@ -185,6 +186,22 @@ export function getPlatformDestinationUrl(acc: SocialAccount, res?: any): string
   }
 
   switch (acc.platform) {
+    case 'threads': {
+      if (res?.externalPostUrl && (res.externalPostUrl.includes('threads.net') || res.externalPostUrl.includes('threads.com'))) {
+        return res.externalPostUrl;
+      }
+      const cleanUsername = acc.username ? acc.username.replace(/^@/, '') : '';
+      if (res?.externalPostId && cleanUsername) {
+        return `https://www.threads.net/@${cleanUsername}/post/${res.externalPostId}`;
+      }
+      if (res?.externalPostId) {
+        return `https://www.threads.net/post/${res.externalPostId}`;
+      }
+      if (cleanUsername) {
+        return `https://www.threads.net/@${cleanUsername}`;
+      }
+      return 'https://www.threads.net';
+    }
     case 'youtube': {
       if (res?.externalPostId) {
         return `https://www.youtube.com/watch?v=${res.externalPostId}`;

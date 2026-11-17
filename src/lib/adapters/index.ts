@@ -504,13 +504,68 @@ export const threadsAdapter: PlatformAdapter = {
     return { valid: errors.length === 0, errors };
   },
   async publish(account, post, override) {
-    await wait(600);
-    const id = `th_${Date.now()}`;
-    return {
-      success: true,
-      externalPostId: id,
-      externalPostUrl: `https://threads.net/@${account.username}/post/${id}`,
-    };
+    const text = override?.caption || post.content;
+    const effectiveMedia = override?.media && override.media.length > 0 ? override.media : post.media || [];
+    const mediaUrls = effectiveMedia.map((m) => m.url).filter(Boolean);
+
+    let token = account.accessToken || '';
+    if (token.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(token);
+        token = parsed.access_token || token;
+      } catch {}
+    }
+
+    if (!token) {
+      return {
+        success: false,
+        errorMessage: 'Threads account is not authorized or access token is missing. Please reconnect Threads in Connections.',
+      };
+    }
+
+    const threadsUserId = account.pageId || account.externalId || account.id.replace(/^th_/, '');
+
+    try {
+      const response = await fetch('/api/threads/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          threadsUserId,
+          accessToken: token,
+          message: text,
+          mediaUrls,
+          mediaUrl: mediaUrls[0],
+          postType: (override?.postType as any) || post.postType,
+          username: account.username,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        const cleanUsername = account.username ? account.username.replace(/^@/, '') : '';
+        const postUrl = data.url || (cleanUsername
+          ? `https://www.threads.net/@${cleanUsername}/post/${data.postId}`
+          : `https://www.threads.net/post/${data.postId}`);
+
+        return {
+          success: true,
+          externalPostId: data.postId,
+          externalPostUrl: postUrl,
+          details: {
+            publishedAt: new Date().toISOString(),
+            threadId: data.threadId || data.postId,
+          },
+        };
+      } else {
+        return {
+          success: false,
+          errorMessage: `Threads API Error: ${data.error || 'Failed to publish post to Threads.'}`,
+        };
+      }
+    } catch (e) {
+      const err = e instanceof Error ? e.message : 'Network error communicating with Threads API';
+      return { success: false, errorMessage: err };
+    }
   },
   async refreshTokens() {
     await wait(400);

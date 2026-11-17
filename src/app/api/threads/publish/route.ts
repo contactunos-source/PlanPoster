@@ -46,8 +46,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const cleanUserId = threadsUserId.trim();
-    const token = accessToken.trim();
+    const cleanUserId = threadsUserId.trim().replace(/^th_/, '');
+    let token = accessToken.trim();
+    if (token.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(token);
+        if (parsed.access_token) token = parsed.access_token;
+      } catch {}
+    }
 
     // Idempotency: prevent accidental duplicate API dispatches within 30s
     const idempotencyKey = `${cleanUserId}:${(message || '').trim()}:${mediaUrls.join(',')}`;
@@ -140,7 +146,12 @@ export async function POST(req: NextRequest) {
     // =========================================================================
     // CASE 2: SINGLE PHOTO
     // =========================================================================
-    else if (mediaUrls.length === 1 && !/\.(mp4|mov|webm)$/i.test(mediaUrls[0])) {
+    else if (
+      mediaUrls.length === 1 &&
+      postType !== 'video' &&
+      postType !== 'reel' &&
+      !/\.(mp4|mov|webm|avi|m4v)$/i.test(mediaUrls[0])
+    ) {
       const photoParams = new URLSearchParams();
       photoParams.append('access_token', token);
       photoParams.append('media_type', 'IMAGE');
@@ -168,7 +179,10 @@ export async function POST(req: NextRequest) {
     // =========================================================================
     // CASE 3: SINGLE VIDEO
     // =========================================================================
-    else if (mediaUrls.length === 1 && /\.(mp4|mov|webm)$/i.test(mediaUrls[0])) {
+    else if (
+      mediaUrls.length === 1 &&
+      (postType === 'video' || postType === 'reel' || /\.(mp4|mov|webm|avi|m4v)$/i.test(mediaUrls[0]))
+    ) {
       const videoParams = new URLSearchParams();
       videoParams.append('access_token', token);
       videoParams.append('media_type', 'VIDEO');
@@ -245,11 +259,16 @@ export async function POST(req: NextRequest) {
     }
 
     const publishedId = publishData.id;
+    const cleanUsername = body.username ? String(body.username).replace(/^@/, '') : '';
+    const postUrl = cleanUsername
+      ? `https://www.threads.net/@${cleanUsername}/post/${publishedId}`
+      : `https://www.threads.net/post/${publishedId}`;
+
     const result = {
       success: true,
       postId: publishedId,
       threadId: publishedId,
-      url: `https://www.threads.net/@user/post/${publishedId}`,
+      url: postUrl,
     };
 
     recentThreadsPublishes.set(idempotencyKey, {
