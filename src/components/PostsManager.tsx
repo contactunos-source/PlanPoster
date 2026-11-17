@@ -181,6 +181,9 @@ export function getPlatformDestinationUrl(acc: SocialAccount, res?: any): string
       (acc.platform === 'pinterest' && url.includes('pinterest.com'));
 
     if (isUrlMatchingPlatform) {
+      if (acc.platform === 'linkedin') {
+        return res.externalPostUrl.replace(/urn%3Ali%3A/gi, 'urn:li:');
+      }
       return res.externalPostUrl;
     }
   }
@@ -240,9 +243,10 @@ export function getPlatformDestinationUrl(acc: SocialAccount, res?: any): string
     }
     case 'linkedin': {
       if (res?.externalPostId) {
-        return `https://www.linkedin.com/feed/update/${res.externalPostId}`;
+        const cleanId = String(res.externalPostId).replace(/urn%3Ali%3A/gi, 'urn:li:');
+        return `https://www.linkedin.com/feed/update/${cleanId}`;
       }
-      return 'https://www.linkedin.com';
+      return 'https://www.linkedin.com/feed';
     }
     default:
       return 'https://planposter.com';

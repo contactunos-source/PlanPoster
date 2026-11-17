@@ -142,6 +142,7 @@ export async function POST(req: NextRequest) {
       }
 
       creationId = carouselData.id;
+      await waitForContainerReady(creationId, token);
     }
     // =========================================================================
     // CASE 2: SINGLE PHOTO
@@ -175,6 +176,7 @@ export async function POST(req: NextRequest) {
       }
 
       creationId = photoData.id;
+      await waitForContainerReady(creationId, token);
     }
     // =========================================================================
     // CASE 3: SINGLE VIDEO
@@ -235,26 +237,51 @@ export async function POST(req: NextRequest) {
     }
 
     // =========================================================================
-    // FINAL STEP: PUBLISH THE CONTAINER
+    // FINAL STEP: PUBLISH THE CONTAINER (WITH RETRY FOR CLUSTER SYNC)
     // =========================================================================
     const publishParams = new URLSearchParams();
     publishParams.append('access_token', token);
     publishParams.append('creation_id', creationId);
 
-    const publishRes = await fetch(
-      `https://graph.threads.net/v1.0/${encodeURIComponent(cleanUserId)}/threads_publish`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: publishParams.toString(),
+    let publishData: any = null;
+    let publishError: string = '';
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, 2000));
       }
-    );
 
-    const publishData = await publishRes.json();
+      const publishRes = await fetch(
+        `https://graph.threads.net/v1.0/${encodeURIComponent(cleanUserId)}/threads_publish`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: publishParams.toString(),
+        }
+      );
 
-    if (!publishRes.ok || !publishData.id) {
+      publishData = await publishRes.json();
+      if (publishRes.ok && publishData?.id) {
+        publishError = '';
+        break;
+      }
+
+      publishError = publishData?.error?.message || 'Failed to publish container on Threads.';
+      const errLower = publishError.toLowerCase();
+      const isResourceNotReady =
+        errLower.includes('resource does not exist') ||
+        errLower.includes('not found') ||
+        publishData?.error?.code === 24 ||
+        publishData?.error?.error_subcode === 4279009;
+
+      if (!isResourceNotReady) {
+        break;
+      }
+    }
+
+    if (!publishData?.id) {
       throw new Error(
-        publishData.error?.message || 'Failed to publish container on Threads.'
+        publishError || 'Failed to publish container on Threads.'
       );
     }
 
@@ -290,11 +317,11 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * Polls container status until video processing is FINISHED or times out (up to 30s)
+ * Polls container status until media (image/video/carousel) processing is FINISHED or times out
  */
-async function waitForContainerReady(containerId: string, accessToken: string, maxAttempts = 12) {
+async function waitForContainerReady(containerId: string, accessToken: string, maxAttempts = 15) {
   for (let i = 0; i < maxAttempts; i++) {
-    await new Promise((r) => setTimeout(r, 2500));
+    await new Promise((r) => setTimeout(r, 1500));
     try {
       const res = await fetch(
         `https://graph.threads.net/v1.0/${encodeURIComponent(
@@ -306,10 +333,10 @@ async function waitForContainerReady(containerId: string, accessToken: string, m
         return true;
       }
       if (data.status === 'ERROR') {
-        throw new Error(data.error_message || 'Video processing failed on Threads.');
+        throw new Error(data.error_message || 'Media processing failed on Threads.');
       }
     } catch (e: any) {
-      if (e?.message?.includes('Video processing failed')) throw e;
+      if (e?.message?.includes('Media processing failed')) throw e;
     }
   }
   return true;

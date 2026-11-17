@@ -318,7 +318,8 @@ export async function POST(req: NextRequest) {
 
     if (postRes.status === 201) {
       const createdPostUrn = postRes.headers.get('x-restli-id') || `urn:li:share:${Date.now()}`;
-      const postUrl = `https://www.linkedin.com/feed/update/${encodeURIComponent(createdPostUrn)}`;
+      const cleanUrn = createdPostUrn.replace(/urn%3Ali%3A/gi, 'urn:li:');
+      const postUrl = `https://www.linkedin.com/feed/update/${cleanUrn}`;
 
       return NextResponse.json({
         success: true,
