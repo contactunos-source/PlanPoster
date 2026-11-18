@@ -14,7 +14,7 @@ export const isPlatformSupportedForPostType = (platform: string, type: 'image' |
     // Instagram supports image and video (posts, reels, stories), but NOT text
     return type === 'image' || type === 'video';
   }
-  // Facebook, LinkedIn, Threads, Pinterest support image, video, and text
+  // Facebook, LinkedIn, Threads support image, video, and text
   return true;
 };
 

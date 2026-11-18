@@ -204,13 +204,6 @@ export const ConnectedAccounts: React.FC<ConnectedAccountsProps> = ({
         </div>
       );
     }
-    if (platform === 'pinterest') {
-      return (
-        <div className="w-6 h-6 rounded-full bg-[#BD081C] flex items-center justify-center shadow-md border-2 border-[#1c1d1f]">
-          <PlatformLogo platform="pinterest" className="w-3.5 h-3.5 text-white" />
-        </div>
-      );
-    }
     return (
       <div className="w-6 h-6 rounded-full bg-black flex items-center justify-center shadow-md border-2 border-[#1c1d1f]">
         <PlatformLogo platform={platform} className="w-3.5 h-3.5 text-white" />
@@ -223,13 +216,12 @@ export const ConnectedAccounts: React.FC<ConnectedAccountsProps> = ({
     'instagram',
     'linkedin',
     'threads',
-    'pinterest',
   ];
 
-  // Clean up any legacy synthetic or invalid mocked accounts
+  // Clean up any legacy synthetic, invalid, or deprecated accounts
   useEffect(() => {
     const invalidAccounts = accounts.filter(
-      (a) => a.id === 'li_org_planposter' || a.pageId === 'urn:li:organization:planposter'
+      (a) => a.id === 'li_org_planposter' || a.pageId === 'urn:li:organization:planposter' || a.platform === 'pinterest'
     );
     if (invalidAccounts.length > 0) {
       invalidAccounts.forEach((inv) => {
@@ -1493,8 +1485,6 @@ export const ConnectedAccounts: React.FC<ConnectedAccountsProps> = ({
                         ? 'bg-[#FF0000]'
                         : connectingPlatform === 'linkedin'
                         ? 'bg-[#0A66C2]'
-                        : connectingPlatform === 'pinterest'
-                        ? 'bg-[#E60023]'
                         : connectingPlatform === 'threads' || connectingPlatform === 'tiktok' || connectingPlatform === 'twitter'
                         ? 'bg-black border border-gray-200'
                         : 'bg-[#0085ff]'
@@ -2082,115 +2072,6 @@ export const ConnectedAccounts: React.FC<ConnectedAccountsProps> = ({
                     </div>
                   </div>
                 ) : null}
-              </div>
-            ) : connectingPlatform === 'pinterest' ? (
-              /* PINTEREST DEDICATED FLOW */
-              <div className="p-6 space-y-5">
-                <div className="text-center">
-                  <div className="w-12 h-12 rounded-2xl bg-[#BD081C] text-white flex items-center justify-center mx-auto mb-3 shadow-sm">
-                    <PlatformLogo platform="pinterest" className="w-6 h-6 text-white" />
-                  </div>
-                  <h2 className="text-xl font-bold text-gray-950 tracking-tight">Connect Pinterest Account</h2>
-                  <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
-                    Publish image and video pins to your boards with custom destination links using the official free Pinterest API v5.
-                  </p>
-                </div>
-
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-2.5 text-xs text-gray-700">
-                  <div className="flex items-start space-x-2.5">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Official Pinterest API v5 (100% Free with zero credit charges).</span>
-                  </div>
-                  <div className="flex items-start space-x-2.5">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Direct pin publishing with custom destination links and board organization.</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-1">
-                  <div>
-                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
-                      Pinterest Username / Board
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. MyStudio or @creativepins"
-                      value={genericHandle}
-                      onChange={(e) => setGenericHandle(e.target.value)}
-                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-hidden focus:border-[#BD081C]"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const clean = genericHandle.trim().replace(/^@/, '') || 'pinterest_creator';
-                      const cleanUser = clean.toLowerCase().replace(/[^a-z0-9]/g, '');
-                      const newAcc: SocialAccount = {
-                        id: `pin_${cleanUser || Date.now()}`,
-                        userId: authUser?.id,
-                        platform: 'pinterest',
-                        username: cleanUser,
-                        displayName: `${clean} (Pinterest)`,
-                        avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(clean)}&background=E60023&color=fff&size=256&bold=true`,
-                        accountType: 'business',
-                        status: 'connected',
-                        followersCount: 4200,
-                        externalId: `pin_${cleanUser || Date.now()}`,
-                      };
-
-                      if (isAccountDuplicate(newAcc)) {
-                        setResultModal({
-                          isOpen: true,
-                          status: 'already_connected',
-                          platform: 'pinterest',
-                          accountName: newAcc.displayName,
-                          avatarUrl: newAcc.avatarUrl,
-                        });
-                        setConnectingPlatform(null);
-                        return;
-                      }
-
-                      const res = await onAddAccount(newAcc);
-                      if (res && res.isDuplicate) {
-                        setResultModal({
-                          isOpen: true,
-                          status: 'already_connected',
-                          platform: 'pinterest',
-                          accountName: newAcc.displayName,
-                          avatarUrl: newAcc.avatarUrl,
-                        });
-                        setConnectingPlatform(null);
-                        return;
-                      }
-
-                      setConnectingPlatform(null);
-                      setGenericHandle('');
-                      setResultModal({
-                        isOpen: true,
-                        status: 'success',
-                        platform: 'pinterest',
-                        accountName: newAcc.displayName,
-                        avatarUrl: newAcc.avatarUrl,
-                      });
-                      if (onNavigateToTab) onNavigateToTab('connections');
-                    }}
-                    className="w-full py-3 px-4 rounded-xl text-xs font-bold bg-[#BD081C] hover:bg-[#a00718] text-white transition-colors shadow-sm flex items-center justify-center space-x-2 cursor-pointer"
-                  >
-                    <PlatformLogo platform="pinterest" className="w-4 h-4 text-white" />
-                    <span>Authorize Pinterest Account</span>
-                  </button>
-                </div>
-
-                <div className="text-center pt-2 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={() => setConnectingPlatform(null)}
-                    className="text-xs text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
               </div>
             ) : null}
           </div>

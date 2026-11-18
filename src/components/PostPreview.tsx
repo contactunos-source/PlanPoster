@@ -811,43 +811,6 @@ export const PostPreview: React.FC<PostPreviewProps> = ({
         </div>
       )}
 
-      {/* 6. PINTEREST PREVIEW */}
-      {selectedPlatform === 'pinterest' && (
-        <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm max-w-[280px] mx-auto text-gray-900">
-          <div className="relative">
-            {media ? (
-              <div className={`bg-neutral-950 ${getMediaAspectClass()} flex items-center justify-center overflow-hidden`}>
-                {media.type === 'video' ? (
-                  <video src={media.url} className={`w-full h-full ${fitClass}`} autoPlay loop muted />
-                ) : (
-                  <img src={media.thumbnailUrl || media.url} alt="Pin media" className={`w-full h-full ${fitClass}`} />
-                )}
-              </div>
-            ) : (
-              <div className="h-64 bg-gray-100 flex items-center justify-center text-xs text-gray-400">
-                Pin image required
-              </div>
-            )}
-            <button
-              type="button"
-              className="absolute top-3 right-3 bg-[#BD081C] hover:bg-[#a00718] text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md cursor-pointer"
-            >
-              Save
-            </button>
-          </div>
-
-          <div className="p-3.5 space-y-1.5">
-            <h4 className="text-xs font-bold text-gray-900 leading-snug line-clamp-2">
-              {caption.split('\n')[0] || 'Pin Title Preview'}
-            </h4>
-            <div className="flex items-center space-x-2 pt-1">
-              <img src={avatar} referrerPolicy="no-referrer" alt={displayName} className="w-5 h-5 rounded-full object-cover" />
-              <span className="text-[11px] font-semibold text-gray-700">{displayName}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Preview Accuracy Disclaimer */}
       <div className="text-[10px] text-gray-400 text-center leading-relaxed px-2 flex items-center justify-center space-x-1">
         <Info className="w-3 h-3 text-gray-400 shrink-0" />

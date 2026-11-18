@@ -143,14 +143,6 @@ const SUPPORTED_PLATFORMS: PlatformConfig[] = [
     limit: 500,
     placeholder: 'Start a thread or share a quick thought (max 500 characters)...',
   },
-  {
-    id: 'pinterest',
-    name: 'Pinterest',
-    brandColor: '#BD081C',
-    badgeBg: 'bg-[#BD081C]',
-    limit: 500,
-    placeholder: 'Describe your pin with descriptive keywords, tags, and link in bio...',
-  },
 ];
 
 interface PlatformVisualConfig {

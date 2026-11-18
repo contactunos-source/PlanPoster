@@ -5,7 +5,6 @@ export const INITIAL_SUPPORTED_PLATFORMS: SocialPlatform[] = [
   'instagram',
   'linkedin',
   'threads',
-  'pinterest',
 ];
 
 export const PLATFORM_CONFIGS: Record<SocialPlatform, PlatformConfig> = {
