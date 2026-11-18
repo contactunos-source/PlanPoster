@@ -239,7 +239,9 @@ export const linkedinAdapter: PlatformAdapter = {
   },
   async publish(account, post, override) {
     const text = override?.caption || post.content;
-    const mediaUrl = post.media && post.media.length > 0 ? post.media[0].url : undefined;
+    const effectiveMedia = override?.media && override.media.length > 0 ? override.media : post.media || [];
+    const mediaUrls = effectiveMedia.map((m) => m.url).filter(Boolean);
+    const mediaUrl = mediaUrls[0];
 
     if (!account.accessToken) {
       return {
@@ -262,7 +264,8 @@ export const linkedinAdapter: PlatformAdapter = {
           accessToken: getSafeAccessToken(account.accessToken),
           message: text,
           mediaUrl,
-          postType: post.postType,
+          mediaUrls,
+          postType: (override?.postType as any) || post.postType,
           title: override?.title || post.content.split('\n')[0]?.substring(0, 80),
         }),
       });

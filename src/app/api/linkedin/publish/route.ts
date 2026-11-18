@@ -93,9 +93,14 @@ export async function POST(req: NextRequest) {
       accessToken,
       message,
       mediaUrl,
+      mediaUrls: rawMediaUrls,
       postType,
       title,
     } = body;
+
+    const mediaUrls: string[] = Array.isArray(rawMediaUrls) && rawMediaUrls.length > 0
+      ? rawMediaUrls
+      : mediaUrl ? [mediaUrl] : [];
 
     if (!accessToken) {
       return NextResponse.json(
@@ -124,7 +129,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!message && !mediaUrl) {
+    if (!message && mediaUrls.length === 0) {
       return NextResponse.json(
         { success: false, error: 'LinkedIn post requires commentary text or media.' },
         { status: 400 }
@@ -133,15 +138,15 @@ export async function POST(req: NextRequest) {
 
     let mediaContentPayload: any = null;
 
-    // Handle Media (Image or Video) Upload
-    if (mediaUrl) {
+    // Handle Media (Single Image, Multi-Image Carousel, or Video) Upload
+    if (mediaUrls.length > 0) {
       try {
-        // Fetch media binary first
+        const firstUrl = mediaUrls[0];
         let mediaBuffer: ArrayBuffer | null = null;
         let contentType = 'image/jpeg';
 
-        if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) {
-          const fetchMediaRes = await fetch(mediaUrl);
+        if (firstUrl.startsWith('http://') || firstUrl.startsWith('https://')) {
+          const fetchMediaRes = await fetch(firstUrl);
           if (fetchMediaRes.ok) {
             mediaBuffer = await fetchMediaRes.arrayBuffer();
             contentType = fetchMediaRes.headers.get('content-type') || contentType;
@@ -152,7 +157,7 @@ export async function POST(req: NextRequest) {
           postType === 'video' ||
           postType === 'reel' ||
           contentType.startsWith('video/') ||
-          /\.(mp4|mov|webm|m4v|avi|mkv)(\?|$)/i.test(mediaUrl);
+          /\.(mp4|mov|webm|m4v|avi|mkv)(\?|$)/i.test(firstUrl);
 
         if (mediaBuffer && isVideo) {
           // --- Official LinkedIn REST Videos API Flow ---
@@ -244,46 +249,88 @@ export async function POST(req: NextRequest) {
             const initErr = await initRes.text();
             console.warn('[LinkedIn Publish] Video initialize returned error:', initErr);
           }
-        } else if (mediaBuffer) {
-          // --- Official LinkedIn REST Images API Flow ---
-          const initRes = await fetchLinkedInRest('https://api.linkedin.com/rest/images?action=initializeUpload', {
-            method: 'POST',
-            accessToken,
-            body: {
-              initializeUploadRequest: {
-                owner: authorUrn,
-              },
-            },
-          });
+        } else {
+          // --- Official LinkedIn REST Images API Flow (Single Image & Multi-Image Carousel) ---
+          const uploadedImageUrns: string[] = [];
+          const imagesToUpload = mediaUrls.slice(0, 20); // LinkedIn allows up to 20 images in multiImage
 
-          if (initRes.ok) {
-            const initData = await initRes.json();
-            const uploadUrl = initData.value?.uploadUrl;
-            const imageUrn = initData.value?.image;
+          for (let i = 0; i < imagesToUpload.length; i++) {
+            const imgUrl = imagesToUpload[i];
+            try {
+              let imgBuf: ArrayBuffer | null = null;
+              let imgType = 'image/jpeg';
 
-            if (uploadUrl && imageUrn) {
-              const uploadRes = await fetch(uploadUrl, {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': contentType,
+              if (i === 0 && mediaBuffer) {
+                imgBuf = mediaBuffer;
+                imgType = contentType;
+              } else if (imgUrl.startsWith('http://') || imgUrl.startsWith('https://')) {
+                const fetchRes = await fetch(imgUrl);
+                if (fetchRes.ok) {
+                  imgBuf = await fetchRes.arrayBuffer();
+                  imgType = fetchRes.headers.get('content-type') || imgType;
+                }
+              }
+
+              if (!imgBuf) {
+                console.warn(`[LinkedIn Publish] Failed to fetch image binary for slide ${i + 1}: ${imgUrl}`);
+                continue;
+              }
+
+              const initRes = await fetchLinkedInRest('https://api.linkedin.com/rest/images?action=initializeUpload', {
+                method: 'POST',
+                accessToken,
+                body: {
+                  initializeUploadRequest: {
+                    owner: authorUrn,
+                  },
                 },
-                body: mediaBuffer,
               });
 
-              if (uploadRes.ok) {
-                mediaContentPayload = {
-                  media: {
-                    title: title || 'Post Image',
-                    id: imageUrn,
-                  },
-                };
+              if (initRes.ok) {
+                const initData = await initRes.json();
+                const uploadUrl = initData.value?.uploadUrl;
+                const imageUrn = initData.value?.image;
+
+                if (uploadUrl && imageUrn) {
+                  const uploadRes = await fetch(uploadUrl, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': imgType },
+                    body: imgBuf,
+                  });
+
+                  if (uploadRes.ok) {
+                    uploadedImageUrns.push(imageUrn);
+                    console.log(`[LinkedIn Publish] Uploaded slide ${i + 1}/${imagesToUpload.length}: ${imageUrn}`);
+                  } else {
+                    console.warn(`[LinkedIn Publish] Slide ${i + 1} binary upload returned status:`, uploadRes.status);
+                  }
+                }
               } else {
-                console.warn('[LinkedIn Publish] Image binary upload returned status:', uploadRes.status);
+                const initErr = await initRes.text();
+                console.warn(`[LinkedIn Publish] Initialize upload for slide ${i + 1} error:`, initErr);
               }
+            } catch (err: any) {
+              console.warn(`[LinkedIn Publish] Error uploading slide ${i + 1}:`, err?.message);
             }
-          } else {
-            const initErr = await initRes.text();
-            console.warn('[LinkedIn Publish] Initialize media upload skipped or returned:', initErr);
+          }
+
+          if (uploadedImageUrns.length > 1) {
+            // Multi-image Carousel Schema (Official LinkedIn REST Posts API format)
+            mediaContentPayload = {
+              multiImage: {
+                images: uploadedImageUrns.map((urn) => ({
+                  id: urn,
+                })),
+              },
+            };
+            console.log(`[LinkedIn Publish] Multi-image carousel successfully created with ${uploadedImageUrns.length} slides.`);
+          } else if (uploadedImageUrns.length === 1) {
+            mediaContentPayload = {
+              media: {
+                title: title || 'Post Image',
+                id: uploadedImageUrns[0],
+              },
+            };
           }
         }
       } catch (mediaErr) {

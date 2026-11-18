@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 
       for (let i = 0; i < slides.length; i++) {
         const slideUrl = slides[i];
-        const isVideo = /\.(mp4|mov|webm)$/i.test(slideUrl);
+        const isVideo = /\.(mp4|mov|webm|avi|m4v)$/i.test(slideUrl);
 
         const childParams = new URLSearchParams();
         childParams.append('access_token', token);
@@ -110,10 +110,8 @@ export async function POST(req: NextRequest) {
 
         childContainerIds.push(childData.id);
 
-        // If video, poll status until container is ready
-        if (isVideo) {
-          await waitForContainerReady(childData.id, token);
-        }
+        // Ensure child item is finished processing on Meta servers before attaching to carousel parent
+        await waitForContainerReady(childData.id, token);
       }
 
       // Create Carousel Container
@@ -317,9 +315,9 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * Polls container status until media (image/video/carousel) processing is FINISHED or times out
+ * Polls container status until media (image/video/carousel) processing is FINISHED or times out (up to 45s)
  */
-async function waitForContainerReady(containerId: string, accessToken: string, maxAttempts = 15) {
+async function waitForContainerReady(containerId: string, accessToken: string, maxAttempts = 30) {
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise((r) => setTimeout(r, 1500));
     try {

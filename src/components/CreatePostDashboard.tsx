@@ -2937,44 +2937,7 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                         })}
                       </div>
 
-                      {/* Professional Edit Media Button (Replaces old aspect-ratio controls) */}
-                      {(() => {
-                        const effectiveMedia = getEffectiveMediaForAccount(acc.id);
-                        const hasImages =
-                          effectiveMedia.length > 0 &&
-                          effectiveMedia.some(
-                            (m) =>
-                              m.type === 'image' ||
-                              /\.(png|jpe?g|webp|gif|svg)$/i.test(m.url || m.name || '')
-                          );
-                        const hasVideos = effectiveMedia.some(
-                          (m) =>
-                            m.type === 'video' ||
-                            /\.(mp4|mov|webm|avi|m4v)$/i.test(m.url || m.name || '')
-                        );
 
-                        if (!hasImages || hasVideos) return null;
-
-                        return (
-                          <div className="flex items-center justify-between px-1 py-1">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                              Media Formatting
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingMediaTarget({ accId: acc.id, isPerPlatform: customizeMediaPerPlatform });
-                                setIsEditMediaStudioOpen(true);
-                              }}
-                              className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-800 border border-emerald-200/90 text-xs font-bold transition-all flex items-center space-x-1.5 shadow-2xs cursor-pointer group"
-                              title="Open Edit Media studio"
-                            >
-                              <Pencil className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
-                              <span>Edit Media</span>
-                            </button>
-                          </div>
-                        );
-                      })()}
 
                       {/* YouTube Image Warning matching reference image media_1793768290589_7a75e9ea.png */}
                       {(() => {
@@ -3282,22 +3245,8 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                                       </div>
                                     </div>
 
-                                    {/* Bottom Row: Actions (Edit Media, Replace, Remove, + Add Slide) */}
+                                    {/* Bottom Row: Actions (Replace, Remove, + Add Slide) */}
                                     <div className="flex items-center gap-1.5 pt-2 border-t border-gray-100">
-                                      {/* Edit Media Studio */}
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setEditingMediaTarget({ accId, isPerPlatform: customizeMediaPerPlatform });
-                                          setIsEditMediaStudioOpen(true);
-                                        }}
-                                        className="flex-1 py-1.5 px-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 border border-emerald-200/80 shadow-2xs"
-                                        title="Crop, transform or reorder slides in Edit Media studio"
-                                      >
-                                        <Sliders className="w-3 h-3 text-emerald-600" />
-                                        <span>Edit Media</span>
-                                      </button>
-                                      
                                       {/* Replace Slide */}
                                       <button
                                         type="button"
