@@ -1,4 +1,5 @@
 import { Post, SocialAccount, PlatformCaptionOverride } from '@/types/social';
+import { getSafeAccessToken, decryptToken } from '@/lib/encryption';
 
 export interface PublishResult {
   success: boolean;
@@ -55,7 +56,7 @@ export const facebookAdapter: PlatformAdapter = {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             pageId: account.pageId || account.externalId || account.id,
-            accessToken: account.accessToken,
+            accessToken: getSafeAccessToken(account.accessToken),
             message: text,
             mediaUrl,
             mediaUrls,
@@ -135,7 +136,7 @@ export const instagramAdapter: PlatformAdapter = {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             igUserId: account.externalId || account.pageId || account.id.replace(/^ig_/, ''),
-            accessToken: account.accessToken,
+            accessToken: getSafeAccessToken(account.accessToken),
             caption: text,
             mediaUrl,
             mediaUrls,
@@ -258,7 +259,7 @@ export const linkedinAdapter: PlatformAdapter = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           authorUrn,
-          accessToken: account.accessToken,
+          accessToken: getSafeAccessToken(account.accessToken),
           message: text,
           mediaUrl,
           postType: post.postType,
@@ -390,8 +391,8 @@ export const youtubeAdapter: PlatformAdapter = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           channelId: account.externalId || account.pageId || account.id,
-          accessToken: account.accessToken,
-          refreshToken: account.refreshToken,
+          accessToken: getSafeAccessToken(account.accessToken),
+          refreshToken: account.refreshToken ? decryptToken(account.refreshToken) : undefined,
           title,
           description,
           tags: override?.tags || post.tags || [],
@@ -508,13 +509,7 @@ export const threadsAdapter: PlatformAdapter = {
     const effectiveMedia = override?.media && override.media.length > 0 ? override.media : post.media || [];
     const mediaUrls = effectiveMedia.map((m) => m.url).filter(Boolean);
 
-    let token = account.accessToken || '';
-    if (token.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(token);
-        token = parsed.access_token || token;
-      } catch {}
-    }
+    const token = getSafeAccessToken(account.accessToken);
 
     if (!token) {
       return {

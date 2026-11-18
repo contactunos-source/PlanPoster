@@ -9,8 +9,13 @@ export async function POST(req: NextRequest) {
     const sigHeader = req.headers.get('stripe-signature') || '';
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 
-    // Verify Stripe signature if secret is available
-    if (webhookSecret && sigHeader) {
+    // Verify Stripe signature with constant-time equality
+    if (webhookSecret) {
+      if (!sigHeader) {
+        console.warn('[StripeWebhook] Missing stripe-signature header');
+        return NextResponse.json({ error: 'Signature required' }, { status: 401 });
+      }
+
       const parts = sigHeader.split(',').reduce((acc: Record<string, string>, part: string) => {
         const [k, v] = part.trim().split('=');
         if (k && v) acc[k] = v;
@@ -20,17 +25,23 @@ export async function POST(req: NextRequest) {
       const t = parts['t'];
       const v1 = parts['v1'];
 
-      if (t && v1) {
-        const signedPayload = `${t}.${rawBody}`;
-        const expectedSignature = crypto
-          .createHmac('sha256', webhookSecret)
-          .update(signedPayload)
-          .digest('hex');
+      if (!t || !v1) {
+        console.warn('[StripeWebhook] Incomplete stripe signature format');
+        return NextResponse.json({ error: 'Malformed signature header' }, { status: 400 });
+      }
 
-        if (expectedSignature !== v1) {
-          console.warn('[StripeWebhook] Signature mismatch');
-          return NextResponse.json({ error: 'Invalid Stripe signature' }, { status: 400 });
-        }
+      const signedPayload = `${t}.${rawBody}`;
+      const expectedSignature = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(signedPayload)
+        .digest('hex');
+
+      const v1Buf = Buffer.from(v1);
+      const expBuf = Buffer.from(expectedSignature);
+
+      if (v1Buf.length !== expBuf.length || !crypto.timingSafeEqual(v1Buf, expBuf)) {
+        console.warn('[StripeWebhook] Signature mismatch');
+        return NextResponse.json({ error: 'Invalid Stripe signature' }, { status: 400 });
       }
     }
 

@@ -8,6 +8,18 @@ import { supabase } from '@/lib/supabase';
  */
 async function handlePublishCron(req: NextRequest) {
   try {
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret) {
+      const authHeader = req.headers.get('authorization') || '';
+      const url = new URL(req.url);
+      const queryKey = url.searchParams.get('key') || '';
+      const isAuthorized = authHeader === `Bearer ${cronSecret}` || queryKey === cronSecret;
+
+      if (!isAuthorized) {
+        return NextResponse.json({ error: 'Unauthorized: Invalid CRON_SECRET' }, { status: 401 });
+      }
+    }
+
     const now = new Date().toISOString();
     let publishedCount = 0;
     let failedCount = 0;

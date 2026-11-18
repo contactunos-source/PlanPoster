@@ -5,8 +5,9 @@ import { supabase } from '@/lib/supabase';
 // Secret for signing owner admin session cookies (must never be exposed in client code)
 const SECRET =
   process.env.ADMIN_SESSION_SECRET ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.FACEBOOK_APP_SECRET ||
-  'postingtube_owner_secret_key_2026_super_admin_hmac';
+  'planposter_owner_super_admin_hmac_secret';
 
 // Session lifetime: 4 hours
 const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
@@ -43,22 +44,22 @@ export function isOwnerEmail(email?: string | null): boolean {
  */
 export function verifyOwnerPasscode(keyInput?: string | null): boolean {
   if (!keyInput) return false;
-  const rawExpected = process.env.OWNER_ADMIN_KEY || 'PostingTubeOwner2026!#';
+  const rawExpected = process.env.OWNER_ADMIN_KEY;
+  if (!rawExpected) {
+    console.error('[Security] OWNER_ADMIN_KEY is not defined in environment variables. Refusing admin passcode.');
+    return false;
+  }
   const expectedKey = rawExpected.replace(/^["']|["']$/g, '').trim();
   const cleanInput = keyInput.trim();
 
-  // Timing-safe comparison against expected key or default key
-  const candidates = [expectedKey, 'PostingTubeOwner2026!#', 'PostingTubeOwner2026!'];
-  for (const cand of candidates) {
-    try {
-      const a = Buffer.from(cleanInput);
-      const b = Buffer.from(cand);
-      if (a.length === b.length && timingSafeEqual(a, b)) {
-        return true;
-      }
-    } catch {}
+  // Timing-safe comparison strictly against configured owner key
+  try {
+    const a = Buffer.from(cleanInput);
+    const b = Buffer.from(expectedKey);
+    return a.length === b.length && timingSafeEqual(a, b);
+  } catch {
+    return false;
   }
-  return false;
 }
 
 /**

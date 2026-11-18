@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { StorageService, INITIAL_ACCOUNTS, INITIAL_POSTS, INITIAL_WORKSPACES } from '@/lib/storage';
 import { Post, SocialAccount, Workspace, PostMedia, PlatformPostMetrics } from '@/types/social';
+import { encryptToken, decryptToken } from '@/lib/encryption';
 
 // Default Workspace ID matching the seeded row in Supabase
 export const DEFAULT_WORKSPACE_ID = '00000000-0000-0000-0000-000000000001';
@@ -171,8 +172,8 @@ export function getAuthoritativeAvatar(account: {
  * Maps Supabase account row to SocialAccount model
  */
 export function mapDbAccountToAccount(row: any): SocialAccount {
-  let accessToken = row.access_token;
-  let refreshToken = row.refresh_token;
+  let accessToken = row.access_token ? decryptToken(row.access_token) : '';
+  let refreshToken = row.refresh_token ? decryptToken(row.refresh_token) : row.refresh_token;
   let tokenExpiresAt = row.token_expires_at;
 
   // Support packed JSON token bundles
@@ -234,6 +235,9 @@ export function mapAccountToDbAccount(account: SocialAccount, workspaceId: strin
       expires_at: account.tokenExpiresAt,
     });
   }
+  if (tokenPayload) {
+    tokenPayload = encryptToken(tokenPayload);
+  }
 
   const validWorkspaceId = (workspaceId && UUID_REGEX.test(workspaceId)) ? workspaceId : DEFAULT_WORKSPACE_ID;
 
@@ -258,7 +262,7 @@ export function mapAccountToDbAccount(account: SocialAccount, workspaceId: strin
   };
 
   if (account.refreshToken) {
-    row.refresh_token = account.refreshToken;
+    row.refresh_token = encryptToken(account.refreshToken);
   }
   if (account.tokenExpiresAt) {
     row.token_expires_at = account.tokenExpiresAt;
