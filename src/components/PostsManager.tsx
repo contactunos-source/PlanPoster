@@ -872,14 +872,8 @@ export const PostsManager: React.FC<PostsManagerProps> = ({
                                   referrerPolicy="no-referrer"
                                   onError={(e) => {
                                     const target = e.target as HTMLImageElement;
-                                    if (!target.dataset.retried && acc.id) {
-                                      target.dataset.retried = 'true';
-                                      target.src = `/api/accounts/avatar/${encodeURIComponent(acc.id)}`;
-                                      return;
-                                    }
                                     target.onerror = null;
-                                    const cleanName = (acc.displayName || acc.username || 'A').replace(/^@/, '');
-                                    target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=059669&color=fff&size=128&bold=true`;
+                                    target.src = '/images/default-avatar.png';
                                   }}
                                   className="w-6 h-6 rounded-lg object-cover border border-gray-200"
                                 />
@@ -1032,14 +1026,8 @@ export const PostsManager: React.FC<PostsManagerProps> = ({
                                             referrerPolicy="no-referrer"
                                             onError={(e) => {
                                               const target = e.target as HTMLImageElement;
-                                              if (!target.dataset.retried && acc.id) {
-                                                target.dataset.retried = 'true';
-                                                target.src = `/api/accounts/avatar/${encodeURIComponent(acc.id)}`;
-                                                return;
-                                              }
                                               target.onerror = null;
-                                              const cleanName = (acc.displayName || acc.username || 'A').replace(/^@/, '');
-                                              target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=059669&color=fff&size=128&bold=true`;
+                                              target.src = '/images/default-avatar.png';
                                             }}
                                             className="w-5 h-5 rounded-md object-cover border border-gray-200"
                                           />
@@ -1716,14 +1704,8 @@ export const PostsManager: React.FC<PostsManagerProps> = ({
                                 referrerPolicy="no-referrer"
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement;
-                                  if (!target.dataset.retried && acc.id) {
-                                    target.dataset.retried = 'true';
-                                    target.src = `/api/accounts/avatar/${encodeURIComponent(acc.id)}`;
-                                    return;
-                                  }
                                   target.onerror = null;
-                                  const cleanName = (acc.displayName || acc.username || 'A').replace(/^@/, '');
-                                  target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=059669&color=fff&size=128&bold=true`;
+                                  target.src = '/images/default-avatar.png';
                                 }}
                                 className="w-9 h-9 rounded-lg object-cover border border-gray-200"
                               />

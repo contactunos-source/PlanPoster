@@ -157,16 +157,8 @@ export const ConnectedAccountSelector: React.FC<ConnectedAccountSelectorProps> =
                       target.src = '/images/plan-poster-avatar.png';
                       return;
                     }
-                    if (!target.dataset.retried) {
-                      target.dataset.retried = 'true';
-                      target.src = `/api/accounts/avatar/${encodeURIComponent(account.id)}`;
-                      return;
-                    }
                     target.onerror = null;
-                    const cleanName = (account.displayName || account.username || 'Account').replace(/^@/, '');
-                    target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                      cleanName
-                    )}&background=059669&color=fff&size=128&bold=true`;
+                    target.src = '/images/default-avatar.png';
                   }}
                 />
               </button>

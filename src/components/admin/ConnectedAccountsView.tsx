@@ -352,20 +352,14 @@ export const ConnectedAccountsView: React.FC<ConnectedAccountsViewProps> = ({
                               ? acc.avatarUrl
                               : acc.id
                               ? `/api/accounts/avatar/${encodeURIComponent(acc.id)}`
-                              : `https://ui-avatars.com/api/?name=${encodeURIComponent((acc.displayName || acc.username || 'A').replace(/^@/, ''))}&background=059669&color=fff&size=128&bold=true`
+                              : '/images/default-avatar.png'
                           }
                           alt={acc.displayName}
                           referrerPolicy="no-referrer"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
-                            if (!target.dataset.retried && acc.id) {
-                              target.dataset.retried = 'true';
-                              target.src = `/api/accounts/avatar/${encodeURIComponent(acc.id)}`;
-                              return;
-                            }
                             target.onerror = null;
-                            const cleanName = (acc.displayName || acc.username || 'A').replace(/^@/, '');
-                            target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=059669&color=fff&size=128&bold=true`;
+                            target.src = '/images/default-avatar.png';
                           }}
                           className="w-8 h-8 rounded-full object-cover border border-gray-200"
                         />

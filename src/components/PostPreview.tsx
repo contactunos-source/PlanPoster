@@ -70,7 +70,7 @@ export const PostPreview: React.FC<PostPreviewProps> = ({
       ? `/api/accounts/avatar/${encodeURIComponent(activeAccount.id)}`
       : activeAccount?.platform === 'facebook' && (activeAccount?.pageId || activeAccount?.id)
       ? `https://graph.facebook.com/${(activeAccount.pageId || activeAccount.id || '').replace(/^fb_/, '')}/picture?type=large`
-      : `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanDisplayName)}&background=059669&color=fff&size=256&bold=true`;
+      : '/images/default-avatar.png';
 
   const effectiveRatio = override?.aspectRatio || aspectRatio;
 
@@ -719,7 +719,15 @@ export const PostPreview: React.FC<PostPreviewProps> = ({
         <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm text-gray-900 space-y-3">
           <div className="flex items-start space-x-3">
             <div className="relative">
-              <img src={avatar} referrerPolicy="no-referrer" alt={username} className="w-9 h-9 rounded-full object-cover" />
+              <img
+                src={avatar}
+                referrerPolicy="no-referrer"
+                alt={username}
+                className="w-9 h-9 rounded-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/images/default-avatar.png';
+                }}
+              />
               <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-black text-white text-[10px] flex items-center justify-center font-bold">
                 +
               </div>
@@ -759,7 +767,15 @@ export const PostPreview: React.FC<PostPreviewProps> = ({
         <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm text-gray-900 space-y-3">
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-2.5">
-              <img src={avatar} referrerPolicy="no-referrer" alt={displayName} className="w-10 h-10 rounded-full object-cover" />
+              <img
+                src={avatar}
+                referrerPolicy="no-referrer"
+                alt={displayName}
+                className="w-10 h-10 rounded-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/images/default-avatar.png';
+                }}
+              />
               <div>
                 <h4 className="text-xs font-bold text-gray-900">{displayName}</h4>
                 <p className="text-[10px] text-gray-500">Creator & Agency Lead • 1st</p>

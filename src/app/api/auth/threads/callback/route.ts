@@ -152,9 +152,7 @@ export async function GET(req: NextRequest) {
       console.warn('[ThreadsOAuth] Could not fetch profile data:', e);
     }
 
-    const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-      displayName || username
-    )}&background=000000&color=ffffff&size=256&bold=true`;
+    const fallbackAvatar = '/images/default-avatar.png';
     const finalAvatar = avatarUrl || fallbackAvatar;
 
     const accountId = `th_${threadsUserId || username}`;

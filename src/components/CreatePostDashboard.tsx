@@ -2830,16 +2830,8 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                               referrerPolicy="no-referrer"
                               onError={(e) => {
                                 const target = e.target as HTMLImageElement;
-                                if (!target.dataset.retried && acc.id) {
-                                  target.dataset.retried = 'true';
-                                  target.src = `/api/accounts/avatar/${encodeURIComponent(acc.id)}`;
-                                  return;
-                                }
                                 target.onerror = null;
-                                const cleanName = (acc.displayName || acc.username || 'A').replace(/^@/, '');
-                                target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                  cleanName
-                                )}&background=059669&color=fff&size=128&bold=true`;
+                                target.src = '/images/default-avatar.png';
                               }}
                               className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-xs"
                             />
@@ -4221,14 +4213,8 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                             referrerPolicy="no-referrer"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
-                              if (!target.dataset.retried && carouselAcc.id) {
-                                target.dataset.retried = 'true';
-                                target.src = `/api/accounts/avatar/${encodeURIComponent(carouselAcc.id)}`;
-                                return;
-                              }
                               target.onerror = null;
-                              const cleanName = (carouselAcc.displayName || carouselAcc.username || 'A').replace(/^@/, '');
-                              target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=059669&color=fff&size=64&bold=true`;
+                              target.src = '/images/default-avatar.png';
                             }}
                             className="w-6 h-6 rounded-full object-cover border border-gray-200"
                           />

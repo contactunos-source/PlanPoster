@@ -154,18 +154,7 @@ export function getAuthoritativeAvatar(account: {
     }
   }
 
-  const name = (account.displayName || account.username || account.platform || 'Account').replace(/^@/, '');
-  const colorMap: Record<string, string> = {
-    youtube: 'FF0000',
-    facebook: '1877F2',
-    instagram: 'E1306C',
-    twitter: '000000',
-    linkedin: '0A66C2',
-    pinterest: 'E60023',
-    tiktok: '000000',
-  };
-  const bg = colorMap[account.platform || ''] || '059669';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${bg}&color=fff&size=256&bold=true`;
+  return '/images/default-avatar.png';
 }
 
 /**

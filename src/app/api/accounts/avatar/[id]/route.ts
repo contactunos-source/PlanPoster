@@ -156,6 +156,23 @@ export async function GET(
           }
         }
 
+        // Threads
+        if (account.platform === 'threads' && token) {
+          try {
+            const thRes = await fetch(
+              `https://graph.threads.net/v1.0/me?fields=id,username,threads_profile_picture_url&access_token=${encodeURIComponent(
+                token
+              )}`
+            );
+            if (thRes.ok) {
+              const thData = await thRes.json();
+              freshAvatarUrl = thData.threads_profile_picture_url || null;
+            }
+          } catch (thErr) {
+            console.warn('[AvatarProxy] Threads avatar fetch error:', thErr);
+          }
+        }
+
         // Mirror fresh avatar to permanent storage
         if (freshAvatarUrl) {
           const permanentUrl = await mirrorAvatarToPermanentStorage(account.id, freshAvatarUrl);
@@ -174,26 +191,10 @@ export async function GET(
     }
   }
 
-  const cleanName = (
-    matchedAccount?.display_name ||
-    matchedAccount?.username ||
-    id.replace(/^(ig_|fb_|yt_|tw_|li_|pin_)/, '') ||
-    'Account'
-  ).replace(/^@/, '');
-
-  const colorMap: Record<string, string> = {
-    youtube: 'FF0000',
-    facebook: '1877F2',
-    instagram: 'E1306C',
-    twitter: '000000',
-    linkedin: '0A66C2',
-    pinterest: 'E60023',
-    tiktok: '000000',
-  };
-  const bg = colorMap[matchedAccount?.platform || ''] || '059669';
-
-  const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-    cleanName
-  )}&background=${bg}&color=fff&size=256&bold=true`;
-  return NextResponse.redirect(fallbackUrl, { status: 307 });
+  return NextResponse.redirect(new URL('/images/default-avatar.png', req.url), {
+    status: 307,
+    headers: {
+      'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+    },
+  });
 }

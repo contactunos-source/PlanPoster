@@ -1171,20 +1171,8 @@ export const ConnectedAccounts: React.FC<ConnectedAccountsProps> = ({
                                       className="w-12 h-12 rounded-full object-cover ring-2 ring-gray-100 shadow-2xs"
                                       onError={(e) => {
                                         const target = e.target as HTMLImageElement;
-                                        if (!target.dataset.retried && account.id) {
-                                          target.dataset.retried = 'true';
-                                          target.src = `/api/accounts/avatar/${encodeURIComponent(account.id)}`;
-                                          return;
-                                        }
                                         target.onerror = null;
-                                        target.style.display = 'none';
-                                        const parent = target.parentElement;
-                                        if (parent && !parent.querySelector('.account-avatar-fallback')) {
-                                          const avatarDiv = document.createElement('div');
-                                          avatarDiv.className = 'account-avatar-fallback w-12 h-12 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-500 shadow-2xs';
-                                          avatarDiv.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
-                                          parent.appendChild(avatarDiv);
-                                        }
+                                        target.src = '/images/default-avatar.png';
                                       }}
                                     />
                                   );
