@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import path from 'path';
+import { getSafeAccessToken } from '@/lib/encryption';
 
 /**
  * Publishes photos, carousels, and reels to an Instagram Professional (Business/Creator) account
@@ -47,6 +48,10 @@ export async function POST(req: NextRequest) {
     // Strip 'ig_' database prefix if present
     let cleanIgUserId = (igUserId || '').replace(/^ig_/, '').trim();
     let cleanToken = (accessToken || '').trim();
+
+    if (cleanToken.startsWith('enc:v1:')) {
+      cleanToken = getSafeAccessToken(cleanToken);
+    }
 
     // If accessToken was stored as a JSON string (e.g. {"access_token":"IGAA...","expires_at":...}), extract raw token
     if (cleanToken.startsWith('{') && cleanToken.includes('access_token')) {

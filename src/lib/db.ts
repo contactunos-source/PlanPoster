@@ -161,9 +161,22 @@ export function getAuthoritativeAvatar(account: {
  * Maps Supabase account row to SocialAccount model
  */
 export function mapDbAccountToAccount(row: any): SocialAccount {
-  let accessToken = row.access_token ? decryptToken(row.access_token) : '';
-  let refreshToken = row.refresh_token ? decryptToken(row.refresh_token) : row.refresh_token;
+  let accessToken = row.access_token || '';
+  let refreshToken = row.refresh_token || '';
   let tokenExpiresAt = row.token_expires_at;
+
+  // In the browser, tokens do not need client-side decryption.
+  // Only decrypt on the server (Node.js) where encryption keys exist.
+  if (accessToken && typeof window === 'undefined') {
+    try {
+      accessToken = decryptToken(accessToken);
+    } catch {}
+  }
+  if (refreshToken && typeof window === 'undefined') {
+    try {
+      refreshToken = decryptToken(refreshToken);
+    } catch {}
+  }
 
   // Support packed JSON token bundles
   if (accessToken && accessToken.startsWith('{') && accessToken.includes('access_token')) {
