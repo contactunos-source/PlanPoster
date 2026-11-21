@@ -780,7 +780,10 @@ export const PostsManager: React.FC<PostsManagerProps> = ({
             </div>
           </div>
         </div>
+      </div>
 
+      {/* Expanded Bottom Post Management Cards & Timeline Area (Expanded on both left & right) */}
+      <div className="w-full max-w-[1680px] mx-auto mt-6">
         {/* Posts List / Timeline */}
         {filteredPosts.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-2xl border border-gray-200 p-8 shadow-xs">
@@ -1487,6 +1490,7 @@ export const PostsManager: React.FC<PostsManagerProps> = ({
             ))}
           </div>
         )}
+      </div>
 
         {/* Comprehensive Post Details Modal */}
         {selectedPostForDetails && (
@@ -1825,7 +1829,6 @@ export const PostsManager: React.FC<PostsManagerProps> = ({
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 };

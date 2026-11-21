@@ -187,7 +187,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   ];
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto font-sans space-y-6 sm:space-y-8 w-full overflow-hidden">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1680px] mx-auto font-sans space-y-6 sm:space-y-8 w-full overflow-hidden">
       {/* Top Header: Title, Live Sync Status & Top Refresh Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-gray-200/90 rounded-2xl p-4 sm:p-6 shadow-xs">
         <div className="flex items-center space-x-3">
@@ -321,7 +321,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                   if (results.length === 0) {
                     return (
                       <tr key={post.id} className="hover:bg-gray-50/50">
-                        <td className="py-3 pl-2 max-w-xs truncate font-medium text-gray-800">
+                        <td className="py-3 pl-2 max-w-md truncate font-medium text-gray-800">
                           {post.content || 'Untitled post'}
                         </td>
                         <td className="py-3 text-gray-400">Direct</td>
@@ -342,7 +342,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
 
                     return (
                       <tr key={`${post.id}_${accId}`} className="hover:bg-gray-50/50">
-                        <td className="py-3 pl-2 max-w-xs truncate font-medium text-gray-800">
+                        <td className="py-3 pl-2 max-w-md truncate font-medium text-gray-800">
                           {post.content || 'Untitled post'}
                         </td>
                         <td className="py-3">

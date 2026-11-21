@@ -784,7 +784,7 @@ export const ConnectedAccounts: React.FC<ConnectedAccountsProps> = ({
   };
 
   return (
-    <div className="p-3 sm:p-6 md:p-8 max-w-6xl mx-auto font-sans w-full overflow-hidden">
+    <div className="p-3 sm:p-6 md:p-8 max-w-[1680px] mx-auto font-sans w-full overflow-hidden">
       {/* Toast Success Popup */}
       {toastMessage && (
         <div className="fixed top-4 right-4 left-4 sm:left-auto sm:right-8 sm:top-8 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 text-xs z-50 animate-in fade-in slide-in-from-top-4 border border-gray-800">
@@ -1313,7 +1313,7 @@ export const ConnectedAccounts: React.FC<ConnectedAccountsProps> = ({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {platforms.map((platform) => {
             const config = PLATFORM_CONFIGS[platform];
             const platformAccounts = accounts.filter(
