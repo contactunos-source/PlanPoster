@@ -636,7 +636,7 @@ export const DatabaseService = {
         }
 
         // Record immutable usage ledger event for each targeted account
-        if (post.status === 'scheduled' || post.status === 'published') {
+        if (post.status === 'scheduled' || post.status === 'published' || post.status === 'partially_published' || post.status === 'publishing') {
           try {
             const { SubscriptionService } = await import('@/lib/subscription');
             await SubscriptionService.recordUsageEvent({
@@ -699,6 +699,7 @@ export const DatabaseService = {
 
   /**
    * Delete a post from Supabase and cache with workspace isolation.
+   * CRITICAL: Preserves immutable post_usage_ledger records so deleted posts NEVER restore monthly quota.
    */
   async deletePost(id: string, userId?: string, workspaceId?: string): Promise<void> {
     const resolvedUser = await getResolvedUserId(userId);
@@ -706,6 +707,55 @@ export const DatabaseService = {
       ? workspaceId
       : await getUserWorkspaceId(resolvedUser || undefined);
 
+    // 1. Fetch post metadata before deletion to preserve its month and quota
+    let postToDelete: any = null;
+    if (resolvedUser) {
+      postToDelete = StorageService.getPosts(resolvedUser).find((p) => p.id === id);
+    }
+    if (!postToDelete && supabase) {
+      try {
+        const { data } = await supabase.from('posts').select('*').eq('id', id).single();
+        if (data) postToDelete = data;
+      } catch {}
+    }
+
+    // 2. Identify monthKey of the post
+    const targetDate = postToDelete?.scheduled_for || postToDelete?.scheduledFor || postToDelete?.published_at || postToDelete?.publishedAt || postToDelete?.created_at || postToDelete?.createdAt || new Date();
+    const dateObj = new Date(targetDate);
+    const validDate = isNaN(dateObj.getTime()) ? new Date() : dateObj;
+    const year = validDate.getUTCFullYear();
+    const month = String(validDate.getUTCMonth() + 1).padStart(2, '0');
+    const monthKey = `${year}-${month}`;
+
+    // 3. Burn post quota in memory and localStorage so UI instantly retains the quota
+    try {
+      const { SubscriptionService } = await import('@/lib/subscription');
+      SubscriptionService.burnPostQuota(id, monthKey, resolvedUser || userId);
+    } catch {}
+
+    // 4. Ensure an immutable record exists in Supabase post_usage_ledger (never deleted)
+    if (supabase) {
+      try {
+        await supabase.from('post_usage_ledger').upsert(
+          [
+            {
+              post_id: id,
+              user_id: resolvedUser || userId || 'customer',
+              workspace_id: targetWsId || null,
+              month_key: monthKey,
+              action_type: 'delete_retained',
+              status: 'committed',
+              idempotency_key: `burned_${monthKey}_${id}`,
+            },
+          ],
+          { onConflict: 'post_id,account_id', ignoreDuplicates: true }
+        );
+      } catch (err) {
+        console.warn('[UsageLedger] Error ensuring post_usage_ledger retention on delete:', err);
+      }
+    }
+
+    // 5. Delete from scheduled_jobs and posts (NEVER delete from post_usage_ledger)
     if (supabase) {
       try {
         await supabase.from('scheduled_jobs').delete().eq('post_id', id);
@@ -719,6 +769,61 @@ export const DatabaseService = {
       const currentPosts = StorageService.getPosts(resolvedUser).filter((p) => p.id !== id);
       StorageService.savePosts(currentPosts, resolvedUser);
     }
+  },
+
+  /**
+   * Retrieves all distinct post IDs consumed from the immutable post_usage_ledger table in Supabase.
+   * Merges Supabase remote records with local client cache to ensure deleted posts never restore quota.
+   */
+  async getLedgerPostIds(monthKey: string, userId?: string, workspaceId?: string): Promise<Set<string>> {
+    const postIds = new Set<string>();
+    const resolvedUser = await getResolvedUserId(userId);
+    const targetWsId = (workspaceId && UUID_REGEX.test(workspaceId))
+      ? workspaceId
+      : await getUserWorkspaceId(resolvedUser || undefined);
+
+    // 1. Query Supabase post_usage_ledger table
+    if (supabase) {
+      try {
+        let query = supabase
+          .from('post_usage_ledger')
+          .select('post_id, month_key, user_id, workspace_id')
+          .eq('month_key', monthKey);
+
+        if (targetWsId) {
+          query = query.or(`workspace_id.eq.${targetWsId},user_id.eq.${resolvedUser || 'customer'},user_id.is.null`);
+        } else if (resolvedUser) {
+          query = query.or(`user_id.eq.${resolvedUser},user_id.is.null`);
+        }
+
+        const { data, error } = await query;
+        if (!error && Array.isArray(data)) {
+          for (const row of data) {
+            if (row.post_id) {
+              postIds.add(row.post_id);
+              // Also sync to SubscriptionService in-memory & local burned sets
+              try {
+                const { SubscriptionService } = await import('@/lib/subscription');
+                SubscriptionService.burnPostQuota(row.post_id, monthKey, resolvedUser || userId);
+              } catch {}
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[UsageLedger] Failed to fetch post_usage_ledger from Supabase:', err);
+      }
+    }
+
+    // 2. Merge with SubscriptionService local ledger
+    try {
+      const { SubscriptionService } = await import('@/lib/subscription');
+      const localIds = SubscriptionService.getLocalLedgerPostIds(monthKey, resolvedUser || userId);
+      for (const id of localIds) {
+        postIds.add(id);
+      }
+    } catch {}
+
+    return postIds;
   },
 
   /**

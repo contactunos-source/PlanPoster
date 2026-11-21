@@ -29,6 +29,7 @@ import {
   List as ListIcon,
   Sparkles,
   RotateCw,
+  Trash2,
 } from 'lucide-react';
 import {
   format,
@@ -76,6 +77,7 @@ interface CalendarViewProps {
   openCreateModal?: () => void;
   onNavigateToTab?: (tab: string) => void;
   onRefreshData?: () => Promise<void> | void;
+  onDeletePost?: (id: string) => void;
 }
 
 export type CalendarViewMode = 'day' | 'week' | 'month' | 'year';
@@ -90,6 +92,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   openCreateModal,
   onNavigateToTab,
   onRefreshData,
+  onDeletePost,
 }) => {
   // Navigation & View Mode
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -1677,10 +1680,25 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             />
 
             {/* Footer Actions */}
-            <div className="pt-2 border-t border-gray-100 flex items-center justify-end">
+            <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+              {onDeletePost && inspectedPost && (
+                <button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to delete this post? Note: deleting a post does not restore monthly quota allowance.')) {
+                      const idToDelete = inspectedPost.id;
+                      closePostModal();
+                      onDeletePost(idToDelete);
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition-colors flex items-center space-x-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Post</span>
+                </button>
+              )}
               <button
                 onClick={() => closePostModal()}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer ml-auto"
               >
                 Close
               </button>

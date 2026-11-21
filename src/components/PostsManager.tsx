@@ -934,7 +934,11 @@ export const PostsManager: React.FC<PostsManagerProps> = ({
                               <FileEdit className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => onDeletePost(post.id)}
+                              onClick={() => {
+                                if (window.confirm('Are you sure you want to delete this post? Note: deleting a post does not restore monthly quota allowance.')) {
+                                  onDeletePost(post.id);
+                                }
+                              }}
                               className="p-1.5 rounded-lg hover:bg-rose-50 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
                               title="Delete post"
                             >
@@ -1102,8 +1106,10 @@ export const PostsManager: React.FC<PostsManagerProps> = ({
                                       </button>
                                       <button
                                         onClick={() => {
-                                          onDeletePost(post.id);
-                                          setMenuOpenPostId(null);
+                                          if (window.confirm('Are you sure you want to delete this post? Note: deleting a post does not restore monthly quota allowance.')) {
+                                            onDeletePost(post.id);
+                                            setMenuOpenPostId(null);
+                                          }
                                         }}
                                         className="w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-600 flex items-center space-x-2 cursor-pointer font-medium border-t border-gray-100"
                                       >

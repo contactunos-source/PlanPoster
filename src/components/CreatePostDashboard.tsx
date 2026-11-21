@@ -83,6 +83,7 @@ interface CreatePostDashboardProps {
   accounts: SocialAccount[];
   allPosts?: Post[];
   initialPost?: Partial<Post>;
+  authUser?: any;
   onSave: (
     postData: Partial<Post>,
     action: 'schedule' | 'publish-now' | 'draft',
@@ -468,6 +469,7 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
   accounts,
   allPosts,
   initialPost,
+  authUser,
   onSave,
   onBack,
   onGoToConnections,
@@ -568,15 +570,28 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
     isFreePlan ? 'free' : ((subscriptionData?.planId as any) || 'pro'),
     {
       excludePostId: initialPost?.id,
+      userId: authUser?.id,
     }
   );
 
   const fetchSubscription = () => {
-    fetch('/api/billing/subscription')
+    const uId = authUser?.id || '';
+    const uEmail = authUser?.email || '';
+    fetch(`/api/billing/subscription?userId=${encodeURIComponent(uId)}&email=${encodeURIComponent(uEmail)}`)
       .then((r) => r.json())
       .then((d) => {
         if (d.success && d.subscription) {
           setSubscriptionData(d.subscription);
+          if (Array.isArray(d.usage?.monthlyPosts?.burnedPostIds)) {
+            const { monthKey } = SubscriptionService.getMonthWindow(new Date());
+            for (const pid of d.usage.monthlyPosts.burnedPostIds) {
+              SubscriptionService.burnPostQuota(pid, monthKey, uId);
+            }
+          }
+          if (typeof d.usage?.monthlyPosts?.totalUsed === 'number' && d.usage.monthlyPosts.totalUsed > 0) {
+            const { monthKey } = SubscriptionService.getMonthWindow(new Date());
+            SubscriptionService.updateMonthlyFloor(monthKey, d.usage.monthlyPosts.totalUsed, uId);
+          }
         }
       })
       .catch(() => {});
@@ -584,7 +599,7 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
 
   useEffect(() => {
     fetchSubscription();
-  }, []);
+  }, [authUser?.id, authUser?.email]);
   // Format Switcher (text / image / video)
   const [currentPostType, setCurrentPostType] = useState<'text' | 'image' | 'video'>(initialPostType);
 

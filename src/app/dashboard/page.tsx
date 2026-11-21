@@ -129,10 +129,22 @@ export default function DashboardPage({ initialTab }: { initialTab?: ActiveTab }
       const userWs = await getUserWorkspaceId(user.id);
       setCurrentWorkspaceId(userWs);
 
-      const [dbAccounts, dbPosts] = await Promise.all([
+      const { SubscriptionService } = await import('@/lib/subscription');
+      const { monthKey } = SubscriptionService.getMonthWindow(new Date());
+
+      const [dbAccounts, dbPosts, ledgerIds] = await Promise.all([
         DatabaseService.getAccounts(user.id, userWs),
         DatabaseService.getPosts(user.id, userWs),
+        DatabaseService.getLedgerPostIds(monthKey, user.id, userWs),
       ]);
+
+      const initialUsage = SubscriptionService.calculateMonthlyUsage(dbPosts, dbAccounts, 'free', {
+        userId: user.id,
+        ledgerPostIds: ledgerIds,
+      });
+      if (initialUsage.totalPostsUsed > 0) {
+        SubscriptionService.updateMonthlyFloor(monthKey, initialUsage.totalPostsUsed, user.id);
+      }
 
       setAccounts(dbAccounts);
       setPosts(dbPosts);
@@ -770,8 +782,33 @@ export default function DashboardPage({ initialTab }: { initialTab?: ActiveTab }
   };
 
   const handleDeletePost = async (id: string) => {
+    // 1. Locate the post to identify its calendar month and quota state
+    const postToDelete = posts.find((p) => p.id === id);
+    if (postToDelete) {
+      const ts = postToDelete.publishedAt || postToDelete.scheduledFor || postToDelete.createdAt || new Date();
+      const { SubscriptionService } = await import('@/lib/subscription');
+      const { monthKey } = SubscriptionService.getMonthWindow(new Date(ts));
+
+      // Permanently burn post ID in local and memory ledger so quota NEVER decreases
+      SubscriptionService.burnPostQuota(id, monthKey, authUser?.id);
+
+      // Lock monthly high-water floor before removing post from state
+      const currentUsage = SubscriptionService.calculateMonthlyUsage(
+        posts,
+        accounts,
+        'free',
+        { userId: authUser?.id }
+      );
+      if (currentUsage.totalPostsUsed > 0) {
+        SubscriptionService.updateMonthlyFloor(monthKey, currentUsage.totalPostsUsed, authUser?.id);
+      }
+    }
+
+    // 2. Remove from active UI state
     setPosts((prev) => prev.filter((p) => p.id !== id));
-    await DatabaseService.deletePost(id, authUser?.id);
+
+    // 3. Delete from Supabase posts and scheduled_jobs tables (post_usage_ledger is strictly preserved)
+    await DatabaseService.deletePost(id, authUser?.id, currentWorkspaceId);
   };
 
   const handlePublishNow = async (post: Post) => {
@@ -1067,6 +1104,7 @@ export default function DashboardPage({ initialTab }: { initialTab?: ActiveTab }
             accounts={accounts}
             allPosts={posts}
             initialPost={editingPost || undefined}
+            authUser={authUser}
             onSave={async (postData, action, onProgress) => {
               const res = await handleSavePost(postData, action, onProgress);
               if (action !== 'publish-now') {
@@ -1133,6 +1171,7 @@ export default function DashboardPage({ initialTab }: { initialTab?: ActiveTab }
                 window.history.pushState(null, '', '/dashboard');
               }
             }}
+            onDeletePost={handleDeletePost}
           />
         )}
 

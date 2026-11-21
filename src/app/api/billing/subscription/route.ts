@@ -21,11 +21,19 @@ export async function GET(req: NextRequest) {
     const scheduledPosts = posts.filter((p) => p.status === 'scheduled');
     const scheduledPostsCount = scheduledPosts.length;
 
+    // Fetch immutable usage ledger post IDs for the current calendar month
+    const { monthKey: currentMonthKey } = SubscriptionService.getMonthWindow(new Date());
+    const ledgerPostIds = await DatabaseService.getLedgerPostIds(currentMonthKey, userId, workspaceId);
+
     // Calculate monthly post usage for current calendar month
     const monthlyUsage = SubscriptionService.calculateMonthlyUsage(
       posts,
       accounts,
-      subscription.planId
+      subscription.planId,
+      {
+        userId,
+        ledgerPostIds,
+      }
     );
 
     const planConfig = OFFICIAL_PLANS[subscription.planId] || OFFICIAL_PLANS.free;
@@ -63,6 +71,7 @@ export async function GET(req: NextRequest) {
           resetsAt: monthlyUsage.resetsAt,
           isLimitReached: monthlyUsage.isLimitReached,
           byChannel: monthlyUsage.accounts,
+          burnedPostIds: Array.from(ledgerPostIds),
         },
         scheduledPosts: {
           total: scheduledPostsCount,

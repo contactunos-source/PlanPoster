@@ -131,6 +131,8 @@ export const ConnectedAccounts: React.FC<ConnectedAccountsProps> = ({
     planId: string;
   } | null>(null);
 
+  const [, setUsageTick] = useState(0);
+
   const fetchSubscription = () => {
     const uId = authUser?.id || '';
     const uEmail = authUser?.email || '';
@@ -139,6 +141,17 @@ export const ConnectedAccounts: React.FC<ConnectedAccountsProps> = ({
       .then((d) => {
         if (d.success && d.subscription) {
           setSubscriptionData(d.subscription);
+          if (Array.isArray(d.usage?.monthlyPosts?.burnedPostIds)) {
+            const { monthKey } = SubscriptionService.getMonthWindow(new Date());
+            for (const pid of d.usage.monthlyPosts.burnedPostIds) {
+              SubscriptionService.burnPostQuota(pid, monthKey, uId);
+            }
+          }
+          if (typeof d.usage?.monthlyPosts?.totalUsed === 'number' && d.usage.monthlyPosts.totalUsed > 0) {
+            const { monthKey } = SubscriptionService.getMonthWindow(new Date());
+            SubscriptionService.updateMonthlyFloor(monthKey, d.usage.monthlyPosts.totalUsed, uId);
+          }
+          setUsageTick((t) => t + 1);
         }
       })
       .catch(() => {});
@@ -147,6 +160,18 @@ export const ConnectedAccounts: React.FC<ConnectedAccountsProps> = ({
   useEffect(() => {
     fetchSubscription();
   }, [authUser?.id, authUser?.email]);
+
+  useEffect(() => {
+    const handleUsageUpdated = () => {
+      setUsageTick((t) => t + 1);
+    };
+    window.addEventListener('pb_usage_updated', handleUsageUpdated);
+    window.addEventListener('storage', handleUsageUpdated);
+    return () => {
+      window.removeEventListener('pb_usage_updated', handleUsageUpdated);
+      window.removeEventListener('storage', handleUsageUpdated);
+    };
+  }, []);
 
   // UI Feedback
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
@@ -1026,7 +1051,9 @@ export const ConnectedAccounts: React.FC<ConnectedAccountsProps> = ({
         {(() => {
           const isFreePlan = subscriptionData?.planId === 'free' || !subscriptionData?.planId;
           const maxChannels = isFreePlan ? 3 : (subscriptionData?.channelsCount || 5);
-          const monthlyUsage = SubscriptionService.calculateMonthlyUsage(posts, accounts, isFreePlan ? 'free' : 'pro');
+          const monthlyUsage = SubscriptionService.calculateMonthlyUsage(posts, accounts, isFreePlan ? 'free' : 'pro', {
+            userId: authUser?.id,
+          });
           const channelUsagePercent = Math.min(100, Math.round((accounts.length / maxChannels) * 100));
           const postsUsagePercent = isFreePlan ? Math.min(100, Math.round((monthlyUsage.totalPostsUsed / 30) * 100)) : 0;
 
@@ -1129,7 +1156,9 @@ export const ConnectedAccounts: React.FC<ConnectedAccountsProps> = ({
           }
 
           const isFreePlan = subscriptionData?.planId === 'free' || !subscriptionData?.planId;
-          const monthlyUsage = SubscriptionService.calculateMonthlyUsage(posts, validAccounts, isFreePlan ? 'free' : 'pro');
+          const monthlyUsage = SubscriptionService.calculateMonthlyUsage(posts, validAccounts, isFreePlan ? 'free' : 'pro', {
+            userId: authUser?.id,
+          });
 
           return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

@@ -126,6 +126,9 @@ export interface MonthlyUsageSummary {
   accounts: Record<string, AccountMonthlyUsage>;
 }
 
+// In-memory cache of burned/consumed post IDs for the current runtime session
+const inMemoryBurnedPostIds = new Set<string>();
+
 export const SubscriptionService = {
   /**
    * Returns list of all defined official PostingTube plans.
@@ -337,11 +340,154 @@ export const SubscriptionService = {
   },
 
   /**
-   * Retrieves unique post IDs from local post_usage_ledger cache/file.
+   * Permanently burns post quota so that even if the post is deleted from the UI,
+   * calendar, or database, the post continues to count against the monthly allowance.
+   */
+  burnPostQuota(postId: string, monthKey: string, userId?: string): void {
+    if (!postId || !monthKey) return;
+    inMemoryBurnedPostIds.add(`${monthKey}:${postId}`);
+    inMemoryBurnedPostIds.add(postId);
+
+    if (typeof window !== 'undefined') {
+      try {
+        const keys = [
+          `pb_burned_ledger_${monthKey}`,
+          `pb_burned_ledger_${monthKey}_${userId || 'default'}`,
+          `pb_usage_ledger_${monthKey}`,
+          `pb_usage_ledger_${monthKey}_${userId || 'default'}`,
+        ];
+
+        for (const k of keys) {
+          let list: string[] = [];
+          try {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) list = parsed;
+            }
+          } catch {}
+          if (!list.includes(postId)) {
+            list.push(postId);
+            localStorage.setItem(k, JSON.stringify(list));
+          }
+        }
+
+        // Also update legacy/global array
+        try {
+          const globalKey = 'pb_burned_ledger';
+          let globalList: string[] = [];
+          const rawGlobal = localStorage.getItem(globalKey);
+          if (rawGlobal) {
+            const parsed = JSON.parse(rawGlobal);
+            if (Array.isArray(parsed)) globalList = parsed;
+          }
+          if (!globalList.includes(postId)) {
+            globalList.push(postId);
+            localStorage.setItem(globalKey, JSON.stringify(globalList));
+          }
+        } catch {}
+
+        // Dispatch storage event so all components react immediately
+        window.dispatchEvent(new CustomEvent('pb_usage_updated', { detail: { monthKey, postId } }));
+      } catch (e) {
+        console.warn('[UsageLedger] Failed to save burned post to localStorage:', e);
+      }
+    }
+  },
+
+  /**
+   * Sets the monthly high-water mark floor so quota can NEVER decrease backwards.
+   */
+  updateMonthlyFloor(monthKey: string, count: number, userId?: string): void {
+    if (!monthKey || !count || count <= 0) return;
+    if (typeof window !== 'undefined') {
+      try {
+        const keys = [
+          `pb_monthly_quota_floor_${monthKey}`,
+          `pb_monthly_quota_floor_${monthKey}_${userId || 'default'}`,
+        ];
+        for (const k of keys) {
+          const current = parseInt(localStorage.getItem(k) || '0', 10);
+          if (count > current) {
+            localStorage.setItem(k, String(count));
+          }
+        }
+      } catch {}
+    }
+  },
+
+  /**
+   * Retrieves the monthly high-water mark floor.
+   */
+  getMonthlyFloor(monthKey: string, userId?: string): number {
+    if (!monthKey) return 0;
+    let floor = 0;
+    if (typeof window !== 'undefined') {
+      try {
+        const keys = [
+          `pb_monthly_quota_floor_${monthKey}`,
+          `pb_monthly_quota_floor_${monthKey}_${userId || 'default'}`,
+        ];
+        for (const k of keys) {
+          const val = parseInt(localStorage.getItem(k) || '0', 10);
+          if (!isNaN(val) && val > floor) floor = val;
+        }
+      } catch {}
+    }
+    return floor;
+  },
+
+  /**
+   * Retrieves unique post IDs from local post_usage_ledger cache/file/localStorage.
+   * Guarantees all deleted posts in this calendar month remain counted.
    */
   getLocalLedgerPostIds(monthKey: string, userId?: string): Set<string> {
     const postIds = new Set<string>();
-    if (typeof window !== 'undefined') return postIds;
+
+    // 1. In-memory burned IDs
+    for (const item of inMemoryBurnedPostIds) {
+      if (item.startsWith(`${monthKey}:`)) {
+        postIds.add(item.replace(`${monthKey}:`, ''));
+      }
+    }
+
+    // 2. Client-side browser localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        const keys = [
+          `pb_burned_ledger_${monthKey}`,
+          `pb_burned_ledger_${monthKey}_${userId || 'default'}`,
+          `pb_usage_ledger_${monthKey}`,
+          `pb_usage_ledger_${monthKey}_${userId || 'default'}`,
+          'pb_burned_ledger',
+        ];
+
+        for (const k of keys) {
+          try {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                for (const item of list) {
+                  if (typeof item === 'string' && item) {
+                    postIds.add(item);
+                  } else if (item && typeof item === 'object') {
+                    if (item.monthKey === monthKey && item.postId) {
+                      postIds.add(item.postId);
+                    } else if (item.postId && (!item.monthKey || item.monthKey === monthKey)) {
+                      postIds.add(item.postId);
+                    }
+                  }
+                }
+              }
+            }
+          } catch {}
+        }
+      } catch {}
+      return postIds;
+    }
+
+    // 3. Server-side filesystem fallback
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const fs = eval("require('fs')");
@@ -394,14 +540,51 @@ export const SubscriptionService = {
     const { monthKey } = this.getMonthWindow(isNaN(dateObj.getTime()) ? new Date() : dateObj);
     const key = idempotencyKey || `ledger_${monthKey}_${postId}`;
 
-    // 1. Write to local JSON file for instant access (server-side only)
+    // 1. Immediately burn and save to client localStorage if in browser
+    if (typeof window !== 'undefined') {
+      this.burnPostQuota(postId, monthKey, userId);
+      try {
+        const ledgerKey = `pb_usage_ledger_${monthKey}`;
+        let list: any[] = [];
+        const raw = localStorage.getItem(ledgerKey);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) list = parsed;
+          } catch {}
+        }
+        if (!list.some((item) => (typeof item === 'string' ? item === postId : item.postId === postId))) {
+          list.push({
+            id: `ledger_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            postId,
+            accountId: accountIds[0] || 'shared',
+            userId: userId || 'customer',
+            workspaceId: workspaceId || null,
+            monthKey,
+            actionType,
+            status: 'committed',
+            idempotencyKey: key,
+            createdAt: new Date().toISOString(),
+          });
+          localStorage.setItem(ledgerKey, JSON.stringify(list));
+        }
+      } catch (err) {
+        console.warn('[UsageLedger] Failed to save usage event to localStorage:', err);
+      }
+    }
+
+    // 2. Write to local JSON file for instant access (server-side only)
     if (typeof window === 'undefined') {
       try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const fs = eval("require('fs')");
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const path = eval("require('path')");
-        const filePath = path.join(process.cwd(), 'src', 'data', 'usage_ledger.json');
+        const dirPath = path.join(process.cwd(), 'src', 'data');
+        if (!fs.existsSync(dirPath)) {
+          fs.mkdirSync(dirPath, { recursive: true });
+        }
+        const filePath = path.join(dirPath, 'usage_ledger.json');
         let current: any[] = [];
         if (fs.existsSync(filePath)) {
           try {
@@ -431,7 +614,7 @@ export const SubscriptionService = {
       }
     }
 
-    // 2. Persist to Supabase public.post_usage_ledger via RPC or upsert
+    // 3. Persist to Supabase public.post_usage_ledger via RPC or upsert
     const client = getSupabaseClient();
     if (client) {
       try {
@@ -488,6 +671,7 @@ export const SubscriptionService = {
       targetDate?: Date;
       excludePostId?: string;
       userId?: string;
+      ledgerPostIds?: Set<string>;
     }
   ): MonthlyUsageSummary {
     const { start, end, resetsAt, monthKey, monthLabel } = this.getMonthWindow(options?.targetDate || new Date());
@@ -518,14 +702,31 @@ export const SubscriptionService = {
       if (p.id) uniquePostIds.add(p.id);
     }
 
-    // Add unique posts from local ledger cache (guarantees deleting posts does NOT restore allowance)
-    const ledgerPostIds = this.getLocalLedgerPostIds(monthKey, options?.userId);
-    for (const pid of ledgerPostIds) {
+    // Add unique posts from caller's ledgerPostIds (e.g. from Supabase)
+    if (options?.ledgerPostIds) {
+      for (const pid of options.ledgerPostIds) {
+        if (options?.excludePostId && pid === options.excludePostId) continue;
+        uniquePostIds.add(pid);
+      }
+    }
+
+    // Add unique posts from local ledger cache (guarantees deleting posts NEVER restores allowance)
+    const localLedgerIds = this.getLocalLedgerPostIds(monthKey, options?.userId);
+    for (const pid of localLedgerIds) {
       if (options?.excludePostId && pid === options.excludePostId) continue;
       uniquePostIds.add(pid);
     }
 
-    const totalPostsUsed = uniquePostIds.size;
+    // High-water mark floor protection: monthly allowance can NEVER go backwards
+    const floor = this.getMonthlyFloor(monthKey, options?.userId);
+    const calculatedCount = uniquePostIds.size;
+    const totalPostsUsed = isPaid ? calculatedCount : Math.max(calculatedCount, floor);
+
+    // Update floor if current usage is higher
+    if (!isPaid && totalPostsUsed > floor) {
+      this.updateMonthlyFloor(monthKey, totalPostsUsed, options?.userId);
+    }
+
     const remainingPosts = isPaid ? 999999 : Math.max(0, totalMaxPosts - totalPostsUsed);
     const isLimitReached = isPaid ? false : totalPostsUsed >= totalMaxPosts;
 
