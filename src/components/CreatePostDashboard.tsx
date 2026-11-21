@@ -3279,30 +3279,16 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                                       </div>
                                     </div>
 
-                                    {/* Bottom Row: Actions (Edit Media, Replace, Remove, + Add Slide) */}
-                                    <div className="flex items-center gap-1.5 pt-2 border-t border-gray-100">
-                                      {/* Edit Media Studio */}
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setEditingMediaTarget({ accId, isPerPlatform: customizeMediaPerPlatform });
-                                          setIsEditMediaStudioOpen(true);
-                                        }}
-                                        className="flex-1 py-1.5 px-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 border border-emerald-200/80 shadow-2xs"
-                                        title="Crop, transform or reorder slides in Edit Media studio"
-                                      >
-                                        <Sliders className="w-3 h-3 text-emerald-600" />
-                                        <span>Edit Media</span>
-                                      </button>
-
+                                    {/* Bottom Row: Actions (Replace, Remove, + Add Slide) */}
+                                    <div className="flex items-center gap-2 pt-2.5 border-t border-gray-100">
                                       {/* Replace Slide */}
                                       <button
                                         type="button"
                                         onClick={() => triggerReplaceSlide(accId, activeSlide)}
-                                        className="flex-1 py-1.5 px-2 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 hover:text-gray-900 text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 border border-gray-200/80 shadow-2xs"
+                                        className="flex-1 py-2 px-3 rounded-xl bg-gray-50 hover:bg-gray-100/90 active:bg-gray-200/80 text-gray-700 hover:text-gray-900 text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-gray-200/80 shadow-2xs"
                                         title="Replace this slide"
                                       >
-                                        <RotateCcw className="w-3 h-3 text-gray-500" />
+                                        <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
                                         <span>Replace</span>
                                       </button>
 
@@ -3310,10 +3296,10 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                                       <button
                                         type="button"
                                         onClick={() => handleCarouselRemoveSlide(accId, activeSlide)}
-                                        className="flex-1 py-1.5 px-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 border border-rose-200/80 shadow-2xs"
+                                        className="flex-1 py-2 px-3 rounded-xl bg-rose-50/80 hover:bg-rose-100/90 active:bg-rose-200/80 text-rose-600 hover:text-rose-700 text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-rose-200/80 shadow-2xs"
                                         title="Remove this slide"
                                       >
-                                        <Trash2 className="w-3 h-3 text-rose-500" />
+                                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                                         <span>Remove</span>
                                       </button>
 
@@ -3322,10 +3308,10 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                                         <button
                                           type="button"
                                           onClick={() => triggerCreateCarousel(accId)}
-                                          className="flex-1 py-1.5 px-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 border border-emerald-200/80 shadow-2xs"
+                                          className="flex-1 py-2 px-3 rounded-xl bg-emerald-50/80 hover:bg-emerald-100/90 active:bg-emerald-200/80 text-emerald-700 hover:text-emerald-800 text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-emerald-200/80 shadow-2xs"
                                           title="Add another slide (up to 10 max)"
                                         >
-                                          <Plus className="w-3 h-3 text-emerald-600" />
+                                          <Plus className="w-3.5 h-3.5 text-emerald-600" />
                                           <span>Add Slide</span>
                                         </button>
                                       )}
@@ -3345,22 +3331,7 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                                         <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded-full shrink-0">Custom</span>
                                       )}
                                     </div>
-                                    <div className="flex items-center space-x-1.5 shrink-0">
-                                      {/* Edit Media button for single image */}
-                                      {currentMedia?.type !== 'video' && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setEditingMediaTarget({ accId, isPerPlatform: customizeMediaPerPlatform });
-                                            setIsEditMediaStudioOpen(true);
-                                          }}
-                                          className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1 border border-emerald-200/80 shadow-2xs"
-                                          title="Open Edit Media studio with ratios and freeform cropping"
-                                        >
-                                          <Sliders className="w-3.5 h-3.5 text-emerald-600" />
-                                          <span>Edit Media</span>
-                                        </button>
-                                      )}
+                                    <div className="flex items-center space-x-2 shrink-0">
                                       {/* Create Carousel button (Only for images on non-YouTube accounts) */}
                                       {currentMedia?.type !== 'video' && !isYouTube && (
                                         <button
@@ -3379,7 +3350,7 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                                         className="px-2.5 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-700 hover:text-gray-900 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1 border border-gray-200/80 shadow-2xs"
                                         title="Replace media with a different file"
                                       >
-                                        <RotateCcw className="w-3 h-3 text-gray-500" />
+                                        <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
                                         <span>Replace</span>
                                       </button>
                                       <button
@@ -3388,7 +3359,7 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                                         className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1 border border-rose-200/80 shadow-2xs"
                                         title="Remove media from post"
                                       >
-                                        <Trash2 className="w-3 h-3 text-rose-500" />
+                                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                                         <span>Remove</span>
                                       </button>
                                     </div>
