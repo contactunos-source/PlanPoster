@@ -149,7 +149,7 @@ export const ConnectedAccounts: React.FC<ConnectedAccountsProps> = ({
           }
           if (typeof d.usage?.monthlyPosts?.totalUsed === 'number' && d.usage.monthlyPosts.totalUsed > 0) {
             const { monthKey } = SubscriptionService.getMonthWindow(new Date());
-            SubscriptionService.updateMonthlyFloor(monthKey, d.usage.monthlyPosts.totalUsed, uId);
+            SubscriptionService.updateMonthlyFloor(monthKey, Math.min(30, d.usage.monthlyPosts.totalUsed), uId);
           }
           setUsageTick((t) => t + 1);
         }

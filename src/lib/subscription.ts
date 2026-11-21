@@ -397,9 +397,11 @@ export const SubscriptionService = {
 
   /**
    * Sets the monthly high-water mark floor so quota can NEVER decrease backwards.
+   * Free plan is strictly capped at 30 posts max.
    */
   updateMonthlyFloor(monthKey: string, count: number, userId?: string): void {
     if (!monthKey || !count || count <= 0) return;
+    const safeCount = Math.min(30, count);
     if (typeof window !== 'undefined') {
       try {
         const keys = [
@@ -408,8 +410,8 @@ export const SubscriptionService = {
         ];
         for (const k of keys) {
           const current = parseInt(localStorage.getItem(k) || '0', 10);
-          if (count > current) {
-            localStorage.setItem(k, String(count));
+          if (safeCount > current || current > 30) {
+            localStorage.setItem(k, String(safeCount));
           }
         }
       } catch {}
@@ -418,6 +420,7 @@ export const SubscriptionService = {
 
   /**
    * Retrieves the monthly high-water mark floor.
+   * Clamps any stale values > 30 back to 30.
    */
   getMonthlyFloor(monthKey: string, userId?: string): number {
     if (!monthKey) return 0;
@@ -429,12 +432,21 @@ export const SubscriptionService = {
           `pb_monthly_quota_floor_${monthKey}_${userId || 'default'}`,
         ];
         for (const k of keys) {
-          const val = parseInt(localStorage.getItem(k) || '0', 10);
-          if (!isNaN(val) && val > floor) floor = val;
+          let val = parseInt(localStorage.getItem(k) || '0', 10);
+          if (!isNaN(val)) {
+            // Clean up any stale values that exceeded 30
+            if (val > 30) {
+              val = 30;
+              try {
+                localStorage.setItem(k, '30');
+              } catch {}
+            }
+            if (val > floor) floor = val;
+          }
         }
       } catch {}
     }
-    return floor;
+    return Math.min(30, floor);
   },
 
   /**
@@ -720,11 +732,14 @@ export const SubscriptionService = {
     // High-water mark floor protection: monthly allowance can NEVER go backwards
     const floor = this.getMonthlyFloor(monthKey, options?.userId);
     const calculatedCount = uniquePostIds.size;
-    const totalPostsUsed = isPaid ? calculatedCount : Math.max(calculatedCount, floor);
+    let totalPostsUsed = isPaid ? calculatedCount : Math.max(calculatedCount, floor);
 
-    // Update floor if current usage is higher
-    if (!isPaid && totalPostsUsed > floor) {
-      this.updateMonthlyFloor(monthKey, totalPostsUsed, options?.userId);
+    // Free plan is strictly capped at 30 posts (never show 31, 32, 34/30)
+    if (!isPaid) {
+      totalPostsUsed = Math.min(30, Math.max(0, totalPostsUsed));
+      if (totalPostsUsed > floor) {
+        this.updateMonthlyFloor(monthKey, totalPostsUsed, options?.userId);
+      }
     }
 
     const remainingPosts = isPaid ? 999999 : Math.max(0, totalMaxPosts - totalPostsUsed);

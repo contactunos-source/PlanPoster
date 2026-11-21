@@ -791,9 +791,9 @@ export const DatabaseService = {
           .eq('month_key', monthKey);
 
         if (targetWsId) {
-          query = query.or(`workspace_id.eq.${targetWsId},user_id.eq.${resolvedUser || 'customer'},user_id.is.null`);
+          query = query.eq('workspace_id', targetWsId);
         } else if (resolvedUser) {
-          query = query.or(`user_id.eq.${resolvedUser},user_id.is.null`);
+          query = query.eq('user_id', resolvedUser);
         }
 
         const { data, error } = await query;

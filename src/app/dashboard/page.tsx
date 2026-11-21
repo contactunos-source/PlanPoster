@@ -143,7 +143,7 @@ export default function DashboardPage({ initialTab }: { initialTab?: ActiveTab }
         ledgerPostIds: ledgerIds,
       });
       if (initialUsage.totalPostsUsed > 0) {
-        SubscriptionService.updateMonthlyFloor(monthKey, initialUsage.totalPostsUsed, user.id);
+        SubscriptionService.updateMonthlyFloor(monthKey, Math.min(30, initialUsage.totalPostsUsed), user.id);
       }
 
       setAccounts(dbAccounts);
@@ -800,7 +800,8 @@ export default function DashboardPage({ initialTab }: { initialTab?: ActiveTab }
         { userId: authUser?.id }
       );
       if (currentUsage.totalPostsUsed > 0) {
-        SubscriptionService.updateMonthlyFloor(monthKey, currentUsage.totalPostsUsed, authUser?.id);
+        const safeFloor = Math.min(30, currentUsage.totalPostsUsed);
+        SubscriptionService.updateMonthlyFloor(monthKey, safeFloor, authUser?.id);
       }
     }
 

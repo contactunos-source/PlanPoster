@@ -590,7 +590,7 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
           }
           if (typeof d.usage?.monthlyPosts?.totalUsed === 'number' && d.usage.monthlyPosts.totalUsed > 0) {
             const { monthKey } = SubscriptionService.getMonthWindow(new Date());
-            SubscriptionService.updateMonthlyFloor(monthKey, d.usage.monthlyPosts.totalUsed, uId);
+            SubscriptionService.updateMonthlyFloor(monthKey, Math.min(30, d.usage.monthlyPosts.totalUsed), uId);
           }
         }
       })
@@ -2936,9 +2936,44 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                         })}
                       </div>
 
+                      {/* Professional Edit Media Button below format selector (ratios, freedom crop & customization) */}
+                      {(() => {
+                        const effectiveMedia = getEffectiveMediaForAccount(acc.id);
+                        const hasImages =
+                          effectiveMedia.length > 0 &&
+                          effectiveMedia.some(
+                            (m) =>
+                              m.type === 'image' ||
+                              /\.(png|jpe?g|webp|gif|svg)$/i.test(m.url || m.name || '')
+                          );
+                        const hasVideos = effectiveMedia.some(
+                          (m) =>
+                            m.type === 'video' ||
+                            /\.(mp4|mov|webm|avi|m4v)$/i.test(m.url || m.name || '')
+                        );
 
+                        if (!hasImages || hasVideos) return null;
 
-                      {/* YouTube Image Warning matching reference image media_1793768290589_7a75e9ea.png */}
+                        return (
+                          <div className="flex items-center justify-between px-1 py-1">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                              Media Formatting
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingMediaTarget({ accId: acc.id, isPerPlatform: customizeMediaPerPlatform });
+                                setIsEditMediaStudioOpen(true);
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-800 border border-emerald-200/90 text-xs font-bold transition-all flex items-center space-x-1.5 shadow-2xs cursor-pointer group"
+                              title="Open Edit Media studio with ratios, freedom crop, and customization"
+                            >
+                              <Sliders className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
+                              <span>Edit Media</span>
+                            </button>
+                          </div>
+                        );
+                      })()}
                       {(() => {
                         const effectiveMedia = getEffectiveMediaForAccount(acc.id);
                         const isImage = effectiveMedia.length > 0 && (effectiveMedia[0].type === 'image' || /\.(png|jpe?g|webp)$/i.test(effectiveMedia[0].name || ''));
@@ -3244,8 +3279,22 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                                       </div>
                                     </div>
 
-                                    {/* Bottom Row: Actions (Replace, Remove, + Add Slide) */}
+                                    {/* Bottom Row: Actions (Edit Media, Replace, Remove, + Add Slide) */}
                                     <div className="flex items-center gap-1.5 pt-2 border-t border-gray-100">
+                                      {/* Edit Media Studio */}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingMediaTarget({ accId, isPerPlatform: customizeMediaPerPlatform });
+                                          setIsEditMediaStudioOpen(true);
+                                        }}
+                                        className="flex-1 py-1.5 px-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 border border-emerald-200/80 shadow-2xs"
+                                        title="Crop, transform or reorder slides in Edit Media studio"
+                                      >
+                                        <Sliders className="w-3 h-3 text-emerald-600" />
+                                        <span>Edit Media</span>
+                                      </button>
+
                                       {/* Replace Slide */}
                                       <button
                                         type="button"
@@ -3297,7 +3346,22 @@ export const CreatePostDashboard: React.FC<CreatePostDashboardProps> = ({
                                       )}
                                     </div>
                                     <div className="flex items-center space-x-1.5 shrink-0">
-                                                                            {/* Create Carousel button (Only for images on non-YouTube accounts) */}
+                                      {/* Edit Media button for single image */}
+                                      {currentMedia?.type !== 'video' && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEditingMediaTarget({ accId, isPerPlatform: customizeMediaPerPlatform });
+                                            setIsEditMediaStudioOpen(true);
+                                          }}
+                                          className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1 border border-emerald-200/80 shadow-2xs"
+                                          title="Open Edit Media studio with ratios and freeform cropping"
+                                        >
+                                          <Sliders className="w-3.5 h-3.5 text-emerald-600" />
+                                          <span>Edit Media</span>
+                                        </button>
+                                      )}
+                                      {/* Create Carousel button (Only for images on non-YouTube accounts) */}
                                       {currentMedia?.type !== 'video' && !isYouTube && (
                                         <button
                                           type="button"
